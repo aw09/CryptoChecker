@@ -6,9 +6,11 @@ from utils import format_currency, get_datetime_now
 from configs import BINANCE_API_KEY, BINANCE_SECRET
 import time
 from binance.websocket.spot.websocket_api import SpotWebsocketAPIClient
+from websocket import WebSocketTimeoutException
 import os
 import json
 import threading
+import logging
 
 pd.options.display.float_format = '{:.5f}'.format
 pd.set_option('display.max_columns', None)
@@ -16,6 +18,8 @@ pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.precision', 2)
 
 client = Client(BINANCE_API_KEY, BINANCE_SECRET)
+last_updated = get_datetime_now()
+websocket_client = None
 
 # Get USDT/IDR exchange rate
 usdt_idr_ticker = client.ticker_price("USDTIDRT")
@@ -54,6 +58,9 @@ print(f"Total Asset Earns in IDR: {format_currency(total_asset_earns * usdt_idr_
 current_prices = {}
 
 def calculate_asset():
+    global last_updated
+    last_updated = datetime.now()
+
     asset_data = []
     total_value = 0
     total_profit_loss = 0
@@ -111,7 +118,7 @@ def calculate_asset():
     os.system('clear')
 
     # Print the DataFrame
-    print(f"Updated at: {get_datetime_now()}")
+    print(f"Updated at: {last_updated}")
     print(f"=== Assets ===")
     print(df)
 
@@ -141,37 +148,51 @@ def error_handler(_, message):
     print(f"Error: {message}")
 
 
-def heartbeat(ws):
+def heartbeat(ws: SpotWebsocketAPIClient):
+    global last_updated
     while True:
-        time.sleep(30)  # send a ping message every 30 seconds
         try:
-            ws.ping("heartbeat")
-        except Exception as e:
-            print("Failed to send ping, reconnecting...")
+            logging.warning("== Heartbeat ==")
+            logging.warning(ws)
+            time.sleep(30)  # check every 30 seconds
+            if (datetime.now() - last_updated).total_seconds() > 30:  # if last update was more than 30 seconds ago
+                print("No updates in the last 30 seconds, reconnecting...")
+                connect_to_websocket()
+                break
+        except WebSocketTimeoutException:
+            print("WebSocket connection timed out. Reconnecting...")
+            time.sleep(5)
             connect_to_websocket()
             break
 
-def pong_handler(ws, message):
-    print("Received pong message: ", message)
 
-websocket_client = None
+def pong_handler(ws):
+    print("Received pong ==")
+
 
 def connect_to_websocket():
     global websocket_client
-    if websocket_client is None:
-        websocket_client = SpotWebsocketAPIClient(
-            api_key=BINANCE_API_KEY,
-            api_secret=BINANCE_SECRET,
-            on_message=message_handler,
-            on_error=error_handler,
-            on_pong=pong_handler,
-        )
-    for asset in account_info['balances']:
-        if float(asset['free']) > 0:
-            symbol = asset['asset'] + "USDT"
-            websocket_client.ticker(symbol=symbol, type="FULL")
+    while True:
+        try:
+            if websocket_client is None:
+                websocket_client = SpotWebsocketAPIClient(
+                    api_key=BINANCE_API_KEY,
+                    api_secret=BINANCE_SECRET,
+                    on_message=message_handler,
+                    on_error=error_handler,
+                    on_pong=pong_handler,
+                    timeout=60
+                )
+            for asset in account_info['balances']:
+                if float(asset['free']) > 0:
+                    symbol = asset['asset'] + "USDT"
+                    websocket_client.ticker(symbol=symbol, type="FULL")
 
-    # Start the heartbeat thread
-    threading.Thread(target=heartbeat, args=(websocket_client,)).start()
+            # Start the heartbeat thread
+            threading.Thread(target=heartbeat, args=(websocket_client,)).start()
+            break
+        except WebSocketTimeoutException:
+            print("WebSocket connection timed out. Reconnecting...")
+            time.sleep(5)
 
 connect_to_websocket()
