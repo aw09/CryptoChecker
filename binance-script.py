@@ -159,7 +159,7 @@ def heartbeat(ws: SpotWebsocketAPIClient):
                 print("No updates in the last 30 seconds, reconnecting...")
                 connect_to_websocket()
                 break
-        except WebSocketTimeoutException:
+        except Exception:
             print("WebSocket connection timed out. Reconnecting...")
             time.sleep(5)
             connect_to_websocket()
@@ -191,8 +191,9 @@ def connect_to_websocket():
             # Start the heartbeat thread
             threading.Thread(target=heartbeat, args=(websocket_client,)).start()
             break
-        except WebSocketTimeoutException:
+        except Exception:
             print("WebSocket connection timed out. Reconnecting...")
             time.sleep(5)
+            websocket_client = None
 
 connect_to_websocket()
