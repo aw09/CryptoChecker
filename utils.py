@@ -19,7 +19,7 @@ def subtract_days_from_timestamp(timestamp, days):
 
     return timestamp
 
-def get_now():
+def get_timestamp_now():
     # Get the current date and time
     now = datetime.now()
 
@@ -28,3 +28,6 @@ def get_now():
 
     # Convert to milliseconds
     return timestamp_now * 1000
+
+def get_datetime_now():
+    return datetime.now()

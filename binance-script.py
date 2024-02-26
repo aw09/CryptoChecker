@@ -2,8 +2,13 @@ import pandas as pd
 from binance.spot import Spot as Client
 import time
 from datetime import datetime, timedelta
-from utils import format_currency
+from utils import format_currency, get_datetime_now
 from configs import BINANCE_API_KEY, BINANCE_SECRET
+import time
+from binance.websocket.spot.websocket_api import SpotWebsocketAPIClient
+import os
+import json
+import threading
 
 pd.options.display.float_format = '{:.5f}'.format
 pd.set_option('display.max_columns', None)
@@ -40,81 +45,133 @@ for earn in earns['rows']:
     asset_earn.append([earn['asset'], earn['totalAmount'], earn['cumulativeTotalRewards'], earn['yesterdayRealTimeRewards']])
 
 df_earn = pd.DataFrame(asset_earn, columns=['Asset', 'Total Amount', 'Cumulative Total Rewards', 'Yesterday Real Time Rewards'])
-print(f"=== Earns ===")
+print(f"\r=== Earns ===")
 print(df_earn)
 print(f"Total Asset Earns: {total_asset_earns}")
 print(f"Total Asset Earns in IDR: {format_currency(total_asset_earns * usdt_idr_rate)}")
 
-asset_data = []
-total_value = 0
-total_profit_loss = 0
-for asset in account_info['balances']:
-    if float(asset['free']) > 0:
-        symbol = asset['asset'] + "USDT"  # Assuming you want the price in USDT
+
+current_prices = {}
+
+def calculate_asset():
+    asset_data = []
+    total_value = 0
+    total_profit_loss = 0
+    for asset in account_info['balances']:
+        if float(asset['free']) > 0:
+            symbol = asset['asset'] + "USDT"
+            try:
+                # Get the current price
+                current_price = current_prices.get(symbol, 0)
+                if current_price == 0:
+                    ticker = client.ticker_price(symbol)
+                    current_price = float(ticker['price'])
+                
+                if float(asset['free']) * current_price > 1:
+                    # Fetch all trades for the symbol
+                    trades = client.my_trades(symbol)
+
+                    # Calculate the total cost and total quantity
+                    total_cost = 0
+                    total_qty = 0
+                    for trade in trades:
+                        if trade['isBuyer']:
+                            total_cost += float(trade['price']) * float(trade['qty'])
+                            total_qty += float(trade['qty'])
+                        else:
+                            total_cost -= float(trade['price']) * float(trade['qty'])
+                            total_qty -= float(trade['qty'])
+                            if total_qty < 0:
+                                total_qty = 0
+                                total_cost = 0
+                    
+                    # Calculate the average cost
+                    avg_price = total_cost / total_qty if total_qty > 0 else 0
+
+                    # Current asset value
+                    asset_value = float(asset['free']) * current_price
+                    
+                    # Calculate the percentage change
+                    pct_change = ((current_price - avg_price) / avg_price) * 100 if avg_price > 0 else 0
+
+
+                    # Calculate the profit or loss
+                    profit_loss = asset_value - total_cost
+                    total_profit_loss += profit_loss
+                    
+                    asset_value = float(asset['free']) * current_price
+                    total_value += asset_value
+                    asset_data.append([asset['asset'], asset['free'], avg_price, total_cost, current_price, asset_value, profit_loss, pct_change])
+            except Exception as e:
+                continue
+
+    # Create a DataFrame and print it
+    df = pd.DataFrame(asset_data, columns=['Asset', 'Free', 'Average Price', 'Total Cost', 'Current Price', 'Current Value', 'Profit/Loss', 'Percentage Change'])
+    df = df.sort_values('Current Value', ascending=False)
+    os.system('clear')
+
+    # Print the DataFrame
+    print(f"Updated at: {get_datetime_now()}")
+    print(f"=== Assets ===")
+    print(df)
+
+    # Convert total value to IDR
+    total_value_idr = total_value * usdt_idr_rate
+
+    # Print total value of assets
+    print(f"Total value of assets in USDT: {total_value}")
+    print(f"USDT/IDR exchange rate: {usdt_idr_rate}")
+    print(f"Total value of assets in IDR: {format_currency(total_value_idr)}")
+    print(f"Total profit/loss in USDT: {total_profit_loss}")
+    print(f"Total profit/loss in IDR: {format_currency(total_profit_loss * usdt_idr_rate)}")
+
+    print(f"Total All Earns and Asset: {total_asset_earns + total_value}")
+    print(f"Total All Earns and Asset in IDR: {format_currency((total_asset_earns + total_value) * usdt_idr_rate)}")
+
+def message_handler(_, message):
+    message = json.loads(message)
+    if message['status'] == 200:
+        result = message['result']
+        symbol = result['symbol']
+        price = float(result['lastPrice'])
+        current_prices[symbol] = price
+        calculate_asset()
+
+def error_handler(_, message):
+    print(f"Error: {message}")
+
+
+def heartbeat(ws):
+    while True:
+        time.sleep(30)  # send a ping message every 30 seconds
         try:
-            # Get the current price
-            ticker = client.ticker_price(symbol)
-            current_price = float(ticker['price'])
-
-            # Fetch all trades for the symbol
-            trades = client.my_trades(symbol)
-
-            if symbol == "MATICUSDT":
-                pass
-
-
-            # Calculate the total cost and total quantity
-            total_cost = 0
-            total_qty = 0
-            for trade in trades:
-                if trade['isBuyer']:
-                    total_cost += float(trade['price']) * float(trade['qty'])
-                    total_qty += float(trade['qty'])
-                else:
-                    total_cost -= float(trade['price']) * float(trade['qty'])
-                    total_qty -= float(trade['qty'])
-                    if total_qty < 0:
-                        total_qty = 0
-                        total_cost = 0
-            
-            # Calculate the average cost
-            avg_price = total_cost / total_qty if total_qty > 0 else 0
-
-            # Current asset value
-            asset_value = float(asset['free']) * current_price
-            
-            # Calculate the percentage change
-            pct_change = ((current_price - avg_price) / avg_price) * 100 if avg_price > 0 else 0
-
-
-            # Calculate the profit or loss
-            profit_loss = asset_value - total_cost
-            total_profit_loss += profit_loss
-            
-            asset_value = float(asset['free']) * current_price
-            total_value += asset_value
-            asset_data.append([asset['asset'], asset['free'], avg_price, total_cost, current_price, asset_value, profit_loss, pct_change])
+            ws.ping("heartbeat")
         except Exception as e:
-            # print(f"Could not fetch trades for {symbol}. Error: {e}")
-            continue  # Skip the current asset and move to the next one
+            print("Failed to send ping, reconnecting...")
+            connect_to_websocket()
+            break
 
-# Create a DataFrame and print it
-df = pd.DataFrame(asset_data, columns=['Asset', 'Free', 'Average Price', 'Total Cost', 'Current Price', 'Current Value', 'Profit/Loss', 'Percentage Change'])
-df = df.sort_values('Current Value', ascending=False)
+def pong_handler(ws, message):
+    print("Received pong message: ", message)
 
-# Print the DataFrame
-print(f"=== Assets ===")
-print(df)
+websocket_client = None
 
-# Convert total value to IDR
-total_value_idr = total_value * usdt_idr_rate
+def connect_to_websocket():
+    global websocket_client
+    if websocket_client is None:
+        websocket_client = SpotWebsocketAPIClient(
+            api_key=BINANCE_API_KEY,
+            api_secret=BINANCE_SECRET,
+            on_message=message_handler,
+            on_error=error_handler,
+            on_pong=pong_handler,
+        )
+    for asset in account_info['balances']:
+        if float(asset['free']) > 0:
+            symbol = asset['asset'] + "USDT"
+            websocket_client.ticker(symbol=symbol, type="FULL")
 
-# Print total value of assets
-print(f"Total value of assets in USDT: {total_value}")
-print(f"USDT/IDR exchange rate: {usdt_idr_rate}")
-print(f"Total value of assets in IDR: {format_currency(total_value_idr)}")
-print(f"Total profit/loss in USDT: {total_profit_loss}")
-print(f"Total profit/loss in IDR: {format_currency(total_profit_loss * usdt_idr_rate)}")
+    # Start the heartbeat thread
+    threading.Thread(target=heartbeat, args=(websocket_client,)).start()
 
-print(f"Total All Earns and Asset: {total_asset_earns + total_value}")
-print(f"Total All Earns and Asset in IDR: {format_currency((total_asset_earns + total_value) * usdt_idr_rate)}")
+connect_to_websocket()
