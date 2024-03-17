@@ -6,6 +6,9 @@ from configs import BINANCE_API_KEY, BINANCE_SECRET
 import time
 import os
 import json
+import sys
+import time
+import argparse
 
 pd.options.display.float_format = '{:.5f}'.format
 pd.set_option('display.max_columns', None)
@@ -42,7 +45,7 @@ def get_spot_asset():
 
 
 
-def calculate_asset():
+def calculate_asset(sort_by='Current Value'):
     global LAST_UPDATED, SPOT_ASSET, PRICE_DICT, ACCOUNT_INFO, BALANCE
     LAST_UPDATED = datetime.now()
 
@@ -103,7 +106,7 @@ def calculate_asset():
 
     # Create a DataFrame and print it
     df = pd.DataFrame(asset_data, columns=['Asset', 'Free', 'Average Price', 'Total Cost', 'Current Price', 'Current Value', 'Profit/Loss', 'Percentage Change'])
-    df = df.sort_values('Current Value', ascending=False)
+    df = df.sort_values(sort_by, ascending=False)
     os.system('clear')
 
     print(df)
@@ -127,6 +130,26 @@ def calculate_asset():
 
 
 
-get_balance()
-get_spot_asset()
-calculate_asset()
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--sortby', default='Current Value')
+    parser.add_argument('--loops', type=int, default=1)
+    parser.add_argument('--interval', type=int, default=1)
+    args = parser.parse_args()
+
+    sort_by = args.sortby
+    loops = args.loops
+    interval = args.interval
+
+
+    loop_count = 0
+    while loops == -1 or loop_count < loops:
+        get_balance()
+        get_spot_asset()
+        calculate_asset(sort_by=sort_by)
+        loop_count += 1
+        time.sleep(interval)
+
+if __name__ == "__main__":
+    # python3 binance-script.py --sortby="Percentage Change" --loops=5 --interval=5
+    main()
