@@ -61,6 +61,12 @@ def calculate_asset():
                 if float(asset['free']) * current_price > 1:
                     # Fetch all trades for the symbol
                     trades = client.my_trades(symbol)
+                    try:
+                        fdusd_trades = (client.my_trades(symbol.replace('USDT', 'FDUSD')))
+                        trades += fdusd_trades
+                    except:
+                        pass
+
 
                     # Calculate the total cost and total quantity
                     total_cost = 0
