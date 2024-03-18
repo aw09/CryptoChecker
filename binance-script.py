@@ -39,8 +39,11 @@ def get_balance():
 def get_spot_asset():
     global SPOT_ASSET, ACCOUNT_INFO
     ACCOUNT_INFO = client.account()
-    exclusion = ['USDT','ETHFI', 'LDGALA']
-    SPOT_ASSET = [x['asset'] + "USDT" for x in ACCOUNT_INFO['balances'] if float(x['free']) > 0 and x['asset'] not in exclusion]
+    exclusion1 = ['USDT','ETHFI', 'FDUSDT']
+    exclusion1 += ['LD' + x for x in exclusion1]
+    exclusion2 = ['LD' + x['asset'] for x in ACCOUNT_INFO['balances']]
+    exclusions = exclusion1 + exclusion2
+    SPOT_ASSET = [x['asset'] + "USDT" for x in ACCOUNT_INFO['balances'] if float(x['free']) > 0 and x['asset'] not in exclusions]
     SPOT_ASSET.append('BTCUSDT')
 
 
