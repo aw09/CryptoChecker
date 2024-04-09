@@ -3,3 +3,4 @@ pandas
 gate-api
 python-dotenv
 ipykernel
+matplotlib
