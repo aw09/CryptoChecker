@@ -2,3 +2,4 @@ binance-connector
 pandas
 gate-api
 python-dotenv
+ipykernel
