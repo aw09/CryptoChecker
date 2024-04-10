@@ -4,3 +4,4 @@ gate-api
 python-dotenv
 ipykernel
 matplotlib
+python-telegram-bot
