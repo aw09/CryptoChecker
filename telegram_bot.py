@@ -15,6 +15,7 @@ from functools import wraps
 
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
+refresh_time = 15 * 60 # 15 minutes
 
 def read_whitelist():
     with open('whitelist.txt', 'r') as file:
@@ -24,13 +25,13 @@ def read_whitelist():
 def authorization(func):
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        if update.effective_user.username not in read_whitelist():
+        if update.effective_user.username not in read_whitelist() and str(update.effective_user.id) not in read_whitelist():
             await update.message.reply_text('You are not authorized to use this bot.')
             return
         return await func(update, context, *args, **kwargs)
     return wrapper
 
-def updateData():
+async def updateData(*args, **kwargs):
     total_binance, usdt_idr_rate = binance_balance()
     total_gate = gate_balance
     manta_bitget = 325
@@ -174,9 +175,14 @@ async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_photo(photo=photo, caption=f"{last_modified}")
 
 
-app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+def main():
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-app.add_handler(CommandHandler("info", sendInfo))
-app.add_handler(CommandHandler("chart", sendChart))
+    app.add_handler(CommandHandler("info", sendInfo))
+    app.add_handler(CommandHandler("chart", sendChart))
 
-app.run_polling()
+    app.job_queue.run_repeating(updateData, interval=refresh_time, first=0)
+    app.run_polling()
+
+if __name__ == '__main__':
+    main()
