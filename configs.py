@@ -13,3 +13,6 @@ GATE_SECRET = os.getenv("GATE_SECRET")
 
 # Wallet
 WALLET_ADDRESS = os.getenv("WALLET_ADDRESS")
+
+# Telegram
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
