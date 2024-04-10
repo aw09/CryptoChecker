@@ -76,7 +76,7 @@ async def updateData(*args, **kwargs):
 
 @authorization
 async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    data = updateData()
+    data = await updateData()
     message = textwrap.dedent(f"""
     {datetime.now()}
           
