@@ -11,10 +11,24 @@ from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 from datetime import datetime
 import textwrap
-
+from functools import wraps
 
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
+
+def read_whitelist():
+    with open('whitelist.txt', 'r') as file:
+        usernames = file.read().splitlines()
+    return usernames
+
+def authorization(func):
+    @wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        if update.effective_user.username not in read_whitelist():
+            await update.message.reply_text('You are not authorized to use this bot.')
+            return
+        return await func(update, context, *args, **kwargs)
+    return wrapper
 
 def updateData():
     total_binance, usdt_idr_rate = binance_balance()
@@ -59,7 +73,7 @@ def updateData():
 
 
 
-
+@authorization
 async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     data = updateData()
     message = textwrap.dedent(f"""
@@ -72,10 +86,6 @@ async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     === GATE.IO ===
     Total Asset in USDT: {data['total_gate']}
     Total Asset in IDR: {format(data['total_gate'] * data['usdt_idr_rate'], ',.0f')}
-
-    === WALLET ===
-    Total Asset in USDT: {format(wallet_balance, ',.0f')}
-    Total Asset in IDR: {format(wallet_balance * data['usdt_idr_rate'], ',.0f')}
 
     === Bitget ===
     Total Asset in USDT: {format(data['total_bitget'], ',.0f')}
@@ -97,7 +107,7 @@ def millions(x, pos):
     return '%1.1fM' % (x * 1e-6)
 
 
-
+@authorization
 async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     df = pd.read_csv(filename)
     df['Date'] = pd.to_datetime(df['Date'])
@@ -154,14 +164,14 @@ async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Apply the formatter to the y-axis of the second plot
     ax3.yaxis.set_major_formatter(formatter)
 
-
     # Adjust the layout
     plt.tight_layout()
 
     # Show the plot
     plt.savefig(chartname)
     with open(chartname, 'rb') as photo:
-        await update.message.reply_photo(photo=photo, caption=f"{datetime.now()}")
+        last_modified = datetime.fromtimestamp(os.path.getmtime(filename))
+        await update.message.reply_photo(photo=photo, caption=f"{last_modified}")
 
 
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
