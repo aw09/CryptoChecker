@@ -61,6 +61,7 @@ async def updateData(*args, **kwargs):
     df.to_csv(filename, mode='a', header=not file_exists, index=False)
 
     result = {
+        'usdt_idr_rate': usdt_idr_rate,
         'btc_price': btc_price,
         'total_binance': total_binance,
         'usdt_idr_rate': usdt_idr_rate,
@@ -80,6 +81,7 @@ async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     data = await updateData()
     message = textwrap.dedent(f"""
     {datetime.now()}
+    USD to IDR Rate: {format(data['usdt_idr_rate'], ',.0f')}
           
     === BINANCE ===
     Total Asset in USDT: {format(data['total_binance'], ',.0f')}
