@@ -2,8 +2,8 @@ binance-connector
 pandas
 gate-api
 python-dotenv
-ipykernel
+#ipykernel
 matplotlib
 python-telegram-bot
 python-telegram-bot[job-queue]
-web3
+#web3

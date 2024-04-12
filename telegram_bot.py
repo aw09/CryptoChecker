@@ -1,6 +1,6 @@
 from binance_script import get_balance as binance_balance, client
 from gate_script import balance as gate_balance
-from wallet_script import balance_usdt as wallet_balance
+#from wallet_script import balance_usdt as wallet_balance
 import os
 import pandas as pd
 from datetime import datetime
@@ -16,6 +16,7 @@ from functools import wraps
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
 refresh_time = 15 * 60 # 15 minutes
+wallet_balance = 3050
 
 def read_whitelist():
     with open('whitelist.txt', 'r') as file:
