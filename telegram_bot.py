@@ -1,5 +1,5 @@
 from binance_script import get_balance as binance_balance, client
-from gate_script import balance as gate_balance
+from gate_script import get_balance as gate_balance
 #from wallet_script import balance_usdt as wallet_balance
 import os
 import pandas as pd
@@ -34,7 +34,7 @@ def authorization(func):
 
 async def updateData(*args, **kwargs):
     total_binance, usdt_idr_rate = binance_balance()
-    total_gate = gate_balance
+    total_gate = gate_balance()
     manta_bitget = 325
     manta_price = client.ticker_price("MANTAUSDT")
     total_bitget = manta_bitget * float(manta_price['price'])

@@ -11,13 +11,12 @@ configuration = gate_api.Configuration(
 # Create an API client
 api_client = gate_api.ApiClient(configuration)
 
-# Create an instance of the API class
-wallet_api = gate_api.WalletApi(api_client)
-
-account_api = gate_api.AccountApi(api_client)
-spot_api = gate_api.SpotApi(api_client)
-balance = float(wallet_api.get_total_balance().total.amount)
+def get_balance():
+    wallet_api = gate_api.WalletApi(api_client)
+    balance = float(wallet_api.get_total_balance().total.amount)
+    return balance
 
 
 if __name__ == '__main__':
+    balance = get_balance()
     print(balance)
