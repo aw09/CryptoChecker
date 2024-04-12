@@ -1,0 +1,1 @@
+docker build -t cryptochecker . && docker run -v /home/agungwck99/CryptoChecker:/app cryptochecker
