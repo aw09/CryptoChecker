@@ -120,7 +120,7 @@ async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     df['Date'] = pd.to_datetime(df['Date'])
     df.set_index('Date', inplace=True)
     formatter = FuncFormatter(millions)
-    
+
     if start_date:
         df = df[df.index >= start_date]
     if end_date:
@@ -184,6 +184,9 @@ async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     with open(chartname, 'rb') as photo:
         last_modified = datetime.fromtimestamp(os.path.getmtime(filename))
         await update.message.reply_photo(photo=photo, caption=f"{last_modified}")
+    
+    os.remove(chartname)
+    plt.close()
 
 
 def main():
