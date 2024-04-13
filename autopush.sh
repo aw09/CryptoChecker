@@ -10,4 +10,4 @@ git add balance_vs_btc.csv
 git commit -m "Auto push balance_vs_btc.csv"
 
 # Push changes to GitHub
-git push origin main
+git push origin master
