@@ -113,6 +113,8 @@ def millions(x, pos):
 
 @authorization
 async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await updateData()
+    
     start_date = context.args[0] if len(context.args) > 0 else None
     end_date = context.args[1] if len(context.args) > 1 else None
 
