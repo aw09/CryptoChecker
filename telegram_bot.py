@@ -113,10 +113,18 @@ def millions(x, pos):
 
 @authorization
 async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    start_date = context.args[0] if len(context.args) > 0 else None
+    end_date = context.args[1] if len(context.args) > 1 else None
+
     df = pd.read_csv(filename)
     df['Date'] = pd.to_datetime(df['Date'])
     df.set_index('Date', inplace=True)
     formatter = FuncFormatter(millions)
+    
+    if start_date:
+        df = df[df.index >= start_date]
+    if end_date:
+        df = df[df.index <= end_date]
 
     # Create a figure and a set of subplots
     fig, axs = plt.subplots(3, 1, figsize=(10, 10))
