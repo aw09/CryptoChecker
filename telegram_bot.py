@@ -194,7 +194,7 @@ async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def check_alerts(context: ContextTypes.DEFAULT_TYPE):
     # Load the alerts from the CSV file
-    df = pd.read_csv('alerts.csv', names=['chat_id', 'coin', 'operator', 'price'])
+    df = pd.read_csv('alerts.csv')
 
     # Map the operator strings to actual operator functions
     operators = {'<': op.lt, '>': op.gt, '<=': op.le, '>=': op.ge, '==': op.eq}
@@ -211,11 +211,11 @@ def check_alerts(context: ContextTypes.DEFAULT_TYPE):
             df = df.drop(index)
 
     # Write the DataFrame back to the CSV file
-    df.to_csv('alerts.csv', index=False, header=False)
+    df.to_csv('alerts.csv', index=False, header=True)
 
 async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Load the alerts from the CSV file
-    df = pd.read_csv('alerts.csv', names=['chat_id', 'coin', 'operator', 'price'])
+    df = pd.read_csv('alerts.csv')
 
     # Filter the alerts for the current chat
     df = df[df['chat_id'] == update.message.chat_id]
@@ -224,17 +224,23 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(df.to_string(index=False))
 
 async def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Get the index of the alert from the message
-    index = int(context.args[0])
+    # Check if the correct number of arguments were provided
+    if len(context.args) != 2:
+        await update.message.reply_text('Invalid number of arguments. Usage: /delete_alert <chat_id> <coin>')
+        return
+
+    # Get the chat_id and the coin name from the message
+    chat_id = int(context.args[0])
+    coin = context.args[1]
 
     # Load the alerts from the CSV file
-    df = pd.read_csv('alerts.csv', names=['chat_id', 'coin', 'operator', 'price'])
+    df = pd.read_csv('alerts.csv')
 
     # Delete the alert
-    df = df.drop(index)
+    df = df[(df.chat_id != chat_id) | (df.coin != coin)]
 
     # Write the DataFrame back to the CSV file
-    df.to_csv('alerts.csv', index=False, header=False)
+    df.to_csv('alerts.csv', index=False, header=True)
 
     # Send a confirmation message
     await update.message.reply_text(f'Alert deleted')
