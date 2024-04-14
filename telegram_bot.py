@@ -213,7 +213,7 @@ def check_alerts(context: ContextTypes.DEFAULT_TYPE):
     # Write the DataFrame back to the CSV file
     df.to_csv('alerts.csv', index=False, header=False)
 
-def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Load the alerts from the CSV file
     df = pd.read_csv('alerts.csv', names=['chat_id', 'coin', 'operator', 'price'])
 
@@ -221,9 +221,9 @@ def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     df = df[df['chat_id'] == update.message.chat_id]
 
     # Send a message with the list of alerts
-    update.message.reply_text(df.to_string(index=False))
+    await update.message.reply_text(df.to_string(index=False))
 
-def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Get the index of the alert from the message
     index = int(context.args[0])
 
@@ -237,18 +237,29 @@ def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     df.to_csv('alerts.csv', index=False, header=False)
 
     # Send a confirmation message
-    update.message.reply_text(f'Alert deleted')
+    await update.message.reply_text(f'Alert deleted')
 
 
-def create_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def create_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Check if the correct number of arguments were provided
+    if len(context.args) != 3:
+        update.message.reply_text('Invalid number of arguments. Usage: /create_alert <coin> <operator> <price>')
+        return
+
     # Get the coin name, the operator, and the alert price from the message
     coin = context.args[0]
     operator = context.args[1]
-    price = float(context.args[2])
 
     # Check if the operator is valid
     if operator not in ['<', '>', '<=', '>=', '==']:
         update.message.reply_text('Invalid operator. Please use one of the following operators: <, >, <=, >=, ==')
+        return
+
+    # Check if the price is a valid number
+    try:
+        price = float(context.args[2])
+    except ValueError:
+        update.message.reply_text('Invalid price. Please enter a valid number.')
         return
 
     # Create a DataFrame with the alert data
@@ -261,7 +272,7 @@ def create_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         df.to_csv('alerts.csv', mode='a', header=False, index=False)
 
     # Send a confirmation message
-    update.message.reply_text(f'Alert created for {coin} {operator} {price}')
+    await update.message.reply_text(f'Alert created for {coin} {operator} {price}')
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
