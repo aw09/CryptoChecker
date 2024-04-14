@@ -16,6 +16,7 @@ from functools import wraps
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
 refresh_time = 15 * 60 # 15 minutes
+refresh_time_alerts = 5 * 60 # 5 minutes
 wallet_balance = 600
 
 def read_whitelist():
@@ -267,7 +268,7 @@ def main():
     app.add_handler(CommandHandler("list_alerts", list_alerts))
 
     app.job_queue.run_repeating(updateData, interval=refresh_time, first=0)
-    app.job_queue.run_repeating(check_alerts, interval=5, first=0)
+    app.job_queue.run_repeating(check_alerts, interval=refresh_time_alerts, first=0)
     app.run_polling()
 
 if __name__ == '__main__':
