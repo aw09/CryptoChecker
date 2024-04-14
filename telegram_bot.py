@@ -203,7 +203,7 @@ def check_alerts(context: ContextTypes.DEFAULT_TYPE):
     for index, row in df.iterrows():
         # Get the current price of the coin
         print(f"Checking alert for {row['coin']}")
-        current_price = client.ticker_price(f"{row['coin']}USDT")['price']
+        current_price = float(client.ticker_price(f"{row['coin']}USDT")['price'])
 
         # If the current price matches the alert condition, send an alert message and delete the alert
         if operators[row['operator']](current_price, row['price']):
