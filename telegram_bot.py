@@ -192,7 +192,7 @@ async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     os.remove(chartname)
     plt.close()
 
-def check_alerts(context: ContextTypes.DEFAULT_TYPE):
+async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
     # Load the alerts from the CSV file
     df = pd.read_csv('alerts.csv')
 
@@ -207,7 +207,7 @@ def check_alerts(context: ContextTypes.DEFAULT_TYPE):
 
         # If the current price matches the alert condition, send an alert message and delete the alert
         if operators[row['operator']](current_price, row['price']):
-            context.bot.send_message(row['chat_id'], f'Price alert: {row["coin"]} is now {row["operator"]} {row["price"]}')
+            await context.bot.send_message(row['chat_id'], f'Price alert: {row["coin"]} is now {row["operator"]} {row["price"]}')
             df = df.drop(index)
 
     # Write the DataFrame back to the CSV file
