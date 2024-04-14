@@ -248,8 +248,11 @@ def create_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Create a DataFrame with the alert data
     df = pd.DataFrame([[update.message.chat_id, coin, operator, price]], columns=['chat_id', 'coin', 'operator', 'price'])
 
-    # Append the alert data to the CSV file
-    df.to_csv('alerts.csv', mode='a', header=False, index=False)
+    # Check if the file exists
+    if not os.path.isfile('alerts.csv'):
+        df.to_csv('alerts.csv', mode='w', header=True, index=False)
+    else:
+        df.to_csv('alerts.csv', mode='a', header=False, index=False)
 
     # Send a confirmation message
     update.message.reply_text(f'Alert created for {coin} {operator} {price}')
