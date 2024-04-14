@@ -16,7 +16,7 @@ from functools import wraps
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
 refresh_time = 15 * 60 # 15 minutes
-wallet_balance = 3050
+wallet_balance = 600
 
 def read_whitelist():
     with open('whitelist.txt', 'r') as file:
