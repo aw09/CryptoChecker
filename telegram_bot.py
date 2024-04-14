@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import textwrap
 from functools import wraps
+import operator as op
 
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
@@ -195,13 +196,17 @@ def check_alerts(context: ContextTypes.DEFAULT_TYPE):
     # Load the alerts from the CSV file
     df = pd.read_csv('alerts.csv', names=['chat_id', 'coin', 'operator', 'price'])
 
+    # Map the operator strings to actual operator functions
+    operators = {'<': op.lt, '>': op.gt, '<=': op.le, '>=': op.ge, '==': op.eq}
+
     # Check each alert
     for index, row in df.iterrows():
         # Get the current price of the coin
+        print(f"Checking alert for {row['coin']}")
         current_price = client.ticker_price(f"{row['coin']}USDT")['price']
 
         # If the current price matches the alert condition, send an alert message and delete the alert
-        if (row['operator'] == '<' and current_price < row['price']) or (row['operator'] == '>' and current_price > row['price']):
+        if operators[row['operator']](current_price, row['price']):
             context.bot.send_message(row['chat_id'], f'Price alert: {row["coin"]} is now {row["operator"]} {row["price"]}')
             df = df.drop(index)
 
