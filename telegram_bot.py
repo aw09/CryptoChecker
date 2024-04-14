@@ -190,14 +190,81 @@ async def sendChart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     os.remove(chartname)
     plt.close()
 
+def check_alerts(context: ContextTypes.DEFAULT_TYPE):
+    # Load the alerts from the CSV file
+    df = pd.read_csv('alerts.csv', names=['chat_id', 'coin', 'operator', 'price'])
+
+    # Check each alert
+    for index, row in df.iterrows():
+        # Get the current price of the coin
+        current_price = client.ticker_price(f"{row['coin']}USDT")['price']
+
+        # If the current price matches the alert condition, send an alert message and delete the alert
+        if (row['operator'] == '<' and current_price < row['price']) or (row['operator'] == '>' and current_price > row['price']):
+            context.bot.send_message(row['chat_id'], f'Price alert: {row["coin"]} is now {row["operator"]} {row["price"]}')
+            df = df.drop(index)
+
+    # Write the DataFrame back to the CSV file
+    df.to_csv('alerts.csv', index=False, header=False)
+
+def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Load the alerts from the CSV file
+    df = pd.read_csv('alerts.csv', names=['chat_id', 'coin', 'operator', 'price'])
+
+    # Filter the alerts for the current chat
+    df = df[df['chat_id'] == update.message.chat_id]
+
+    # Send a message with the list of alerts
+    update.message.reply_text(df.to_string(index=False))
+
+def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Get the index of the alert from the message
+    index = int(context.args[0])
+
+    # Load the alerts from the CSV file
+    df = pd.read_csv('alerts.csv', names=['chat_id', 'coin', 'operator', 'price'])
+
+    # Delete the alert
+    df = df.drop(index)
+
+    # Write the DataFrame back to the CSV file
+    df.to_csv('alerts.csv', index=False, header=False)
+
+    # Send a confirmation message
+    update.message.reply_text(f'Alert deleted')
+
+
+def create_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Get the coin name, the operator, and the alert price from the message
+    coin = context.args[0]
+    operator = context.args[1]
+    price = float(context.args[2])
+
+    # Check if the operator is valid
+    if operator not in ['<', '>', '<=', '>=', '==']:
+        update.message.reply_text('Invalid operator. Please use one of the following operators: <, >, <=, >=, ==')
+        return
+
+    # Create a DataFrame with the alert data
+    df = pd.DataFrame([[update.message.chat_id, coin, operator, price]], columns=['chat_id', 'coin', 'operator', 'price'])
+
+    # Append the alert data to the CSV file
+    df.to_csv('alerts.csv', mode='a', header=False, index=False)
+
+    # Send a confirmation message
+    update.message.reply_text(f'Alert created for {coin} {operator} {price}')
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     app.add_handler(CommandHandler("info", sendInfo))
     app.add_handler(CommandHandler("chart", sendChart))
+    app.add_handler(CommandHandler("create_alert", create_alert))
+    app.add_handler(CommandHandler("delete_alert", delete_alert))
+    app.add_handler(CommandHandler("list_alerts", list_alerts))
 
     app.job_queue.run_repeating(updateData, interval=refresh_time, first=0)
+    app.job_queue.run_repeating(check_alerts, interval=5, first=0)
     app.run_polling()
 
 if __name__ == '__main__':
