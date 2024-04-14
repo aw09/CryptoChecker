@@ -243,7 +243,7 @@ async def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def create_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Check if the correct number of arguments were provided
     if len(context.args) != 3:
-        update.message.reply_text('Invalid number of arguments. Usage: /create_alert <coin> <operator> <price>')
+        await update.message.reply_text('Invalid number of arguments. Usage: /create_alert <coin> <operator> <price>')
         return
 
     # Get the coin name, the operator, and the alert price from the message
@@ -252,14 +252,14 @@ async def create_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     # Check if the operator is valid
     if operator not in ['<', '>', '<=', '>=', '==']:
-        update.message.reply_text('Invalid operator. Please use one of the following operators: <, >, <=, >=, ==')
+        await update.message.reply_text('Invalid operator. Please use one of the following operators: <, >, <=, >=, ==')
         return
 
     # Check if the price is a valid number
     try:
         price = float(context.args[2])
     except ValueError:
-        update.message.reply_text('Invalid price. Please enter a valid number.')
+        await update.message.reply_text('Invalid price. Please enter a valid number.')
         return
 
     # Create a DataFrame with the alert data
