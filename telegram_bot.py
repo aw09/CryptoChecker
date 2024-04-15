@@ -7,7 +7,6 @@ from datetime import datetime
 from configs import TELEGRAM_TOKEN
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from telegram.ext import ParseMode
 from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 from datetime import datetime
