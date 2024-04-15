@@ -5,7 +5,7 @@ import os
 import pandas as pd
 from datetime import datetime
 from configs import TELEGRAM_TOKEN
-from telegram import Update, ParseMode
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from telegram.ext import ParseMode
 from matplotlib.ticker import FuncFormatter
@@ -203,7 +203,7 @@ async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
     # Check each alert
     for index, row in df.iterrows():
         # Get the current price of the coin
-        if row['coin'].includes('Total'):
+        if 'Total' in row['coin']:
             balance_df = pd.read_csv(filename)
             current_price = float(balance_df.tail(1)[row['coin']].item())
         else:
