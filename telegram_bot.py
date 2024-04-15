@@ -17,7 +17,7 @@ import operator as op
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
 refresh_time = 3 * 60 # 15 minutes
-wallet_balance = 600
+wallet_balance = 0
 
 def read_whitelist():
     with open('whitelist.txt', 'r') as file:
