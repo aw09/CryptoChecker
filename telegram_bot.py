@@ -234,6 +234,14 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         table += ' | '.join(escaped_values) + '\n'
     table += '</pre>'
 
+    table = '''<pre>
+| Tables   |      Are      |  Cool |
+|----------|:-------------:|------:|
+| col 1 is |  left-aligned | $1600 |
+| col 2 is |    centered   |   $12 |
+| col 3 is | right-aligned |    $1 |
+</pre>'''
+
     # Send a message with the list of alerts
     await update.message.reply_html(table)
 
