@@ -237,13 +237,13 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Check if the correct number of arguments were provided
-    if len(context.args) != 2:
-        await update.message.reply_text('Invalid number of arguments. Usage: /delete_alert <chat_id> <coin>')
+    if len(context.args) != 1:
+        await update.message.reply_text('Invalid number of arguments. Usage: /delete_alert <coin>')
         return
 
-    # Get the chat_id and the coin name from the message
-    chat_id = int(context.args[0])
-    coin = context.args[1]
+    # Get the chat_id from the update object and the coin name from the message
+    chat_id = update.message.chat_id
+    coin = context.args[0]
 
     # Load the alerts from the CSV file
     df = pd.read_csv('alerts.csv')
@@ -255,7 +255,7 @@ async def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     df.to_csv('alerts.csv', index=False, header=True)
 
     # Send a confirmation message
-    await update.message.reply_text(f'Alert deleted')
+    await update.message.reply_text(f'Alert for {coin} deleted')
 
 
 async def create_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
