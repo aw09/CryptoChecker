@@ -226,12 +226,13 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     df = df[df['chat_id'] == update.message.chat_id]
     df = df.drop(columns='chat_id')
 
-    # Format the DataFrame as a Markdown table
-    table = ' | '.join(df.columns) + '\n' + ' | '.join(['---'] * len(df.columns)) + '\n'
+    # Format the DataFrame as a pre-formatted fixed-width code block
+    table = '```\n' + ' | '.join(df.columns) + '\n' + ' | '.join(['---'] * len(df.columns)) + '\n'
     for index, row in df.iterrows():
         # Escape special Markdown characters
         escaped_values = [re.sub(r'([_*\[\]()~`>#+\-=|{}.!])', r'\\\1', str(value)) for value in row.values]
         table += ' | '.join(escaped_values) + '\n'
+    table += '```'
 
     # Send a message with the list of alerts
     await update.message.reply_markdown(table)
