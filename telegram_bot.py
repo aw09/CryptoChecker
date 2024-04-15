@@ -5,8 +5,9 @@ import os
 import pandas as pd
 from datetime import datetime
 from configs import TELEGRAM_TOKEN
-from telegram import Update
+from telegram import Update, ParseMode
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ParseMode
 from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 from datetime import datetime
@@ -222,9 +223,15 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     # Filter the alerts for the current chat
     df = df[df['chat_id'] == update.message.chat_id]
+    df = df.drop(columns='chat_id')
+
+    # Format the DataFrame as a Markdown table
+    table = ' | '.join(df.columns) + '\n' + ' | '.join(['---'] * len(df.columns)) + '\n'
+    for index, row in df.iterrows():
+        table += ' | '.join(row.values.astype(str)) + '\n'
 
     # Send a message with the list of alerts
-    await update.message.reply_text(df.to_string(index=False))
+    await update.message.reply_markdown(table)
 
 async def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Check if the correct number of arguments were provided
