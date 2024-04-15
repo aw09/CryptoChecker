@@ -202,8 +202,11 @@ async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
     # Check each alert
     for index, row in df.iterrows():
         # Get the current price of the coin
-        print(f"Checking alert for {row['coin']}")
-        current_price = float(client.ticker_price(f"{row['coin']}USDT")['price'])
+        if row['coin'].includes('Total'):
+            balance_df = pd.read_csv(filename)
+            current_price = float(balance_df.tail(1)[row['coin']].item())
+        else:
+            current_price = float(client.ticker_price(f"{row['coin']}USDT")['price'])
 
         # If the current price matches the alert condition, send an alert message and delete the alert
         if operators[row['operator']](current_price, row['price']):
