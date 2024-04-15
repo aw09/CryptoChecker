@@ -13,7 +13,7 @@ from datetime import datetime
 import textwrap
 from functools import wraps
 import operator as op
-import re
+import html
 
 
 filename = 'balance_vs_btc.csv'
@@ -227,15 +227,15 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     df = df.drop(columns='chat_id')
 
     # Format the DataFrame as a pre-formatted fixed-width code block
-    table = '```\n' + ' | '.join(df.columns) + '\n' + ' | '.join(['---'] * len(df.columns)) + '\n'
+    table = '<pre>\n' + ' | '.join(df.columns) + '\n' + ' | '.join(['---'] * len(df.columns)) + '\n'
     for index, row in df.iterrows():
-        # Escape special Markdown characters
-        escaped_values = [re.sub(r'([_*\[\]()~`>#+\-=|{}.!])', r'\\\1', str(value)) for value in row.values]
+        # Escape special HTML characters
+        escaped_values = [html.escape(str(value)) for value in row.values]
         table += ' | '.join(escaped_values) + '\n'
-    table += '```'
+    table += '</pre>'
 
     # Send a message with the list of alerts
-    await update.message.reply_markdown(table)
+    await update.message.reply_html(table)
 
 async def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Check if the correct number of arguments were provided
