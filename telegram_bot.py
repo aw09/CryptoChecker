@@ -13,6 +13,8 @@ from datetime import datetime
 import textwrap
 from functools import wraps
 import operator as op
+import re
+
 
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
@@ -227,7 +229,9 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Format the DataFrame as a Markdown table
     table = ' | '.join(df.columns) + '\n' + ' | '.join(['---'] * len(df.columns)) + '\n'
     for index, row in df.iterrows():
-        table += ' | '.join(row.values.astype(str)) + '\n'
+        # Escape special Markdown characters
+        escaped_values = [re.sub(r'([_*\[\]()~`>#+\-=|{}.!])', r'\\\1', str(value)) for value in row.values]
+        table += ' | '.join(escaped_values) + '\n'
 
     # Send a message with the list of alerts
     await update.message.reply_markdown(table)
