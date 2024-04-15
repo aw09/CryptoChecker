@@ -13,8 +13,6 @@ from datetime import datetime
 import textwrap
 from functools import wraps
 import operator as op
-import html
-
 
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
@@ -226,24 +224,16 @@ async def list_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     df = df[df['chat_id'] == update.message.chat_id]
     df = df.drop(columns='chat_id')
 
-    # Format the DataFrame as a pre-formatted fixed-width code block
-    table = '<pre>\n' + ' | '.join(df.columns) + '\n' + ' | '.join(['---'] * len(df.columns)) + '\n'
+    # Format the DataFrame as a list of strings
+    alerts = []
     for index, row in df.iterrows():
-        # Escape special HTML characters
-        escaped_values = [html.escape(str(value)) for value in row.values]
-        table += ' | '.join(escaped_values) + '\n'
-    table += '</pre>'
+        alerts.append(f"{row['coin']} {row['operator']} {row['price']}")
 
-    table = '''<pre>
-| Tables   |      Are      |  Cool |
-|----------|:-------------:|------:|
-| col 1 is |  left-aligned | $1600 |
-| col 2 is |    centered   |   $12 |
-| col 3 is | right-aligned |    $1 |
-</pre>'''
+    # Concatenate all alerts into a single string
+    alerts_message = '\n'.join(alerts)
 
     # Send a message with the list of alerts
-    await update.message.reply_html(table)
+    await update.message.reply_text(alerts_message)
 
 async def delete_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Check if the correct number of arguments were provided
