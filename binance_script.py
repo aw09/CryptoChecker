@@ -33,6 +33,7 @@ TOTAL_ASSET_IN_BTC, TOTAL_ASSET_IN_USDT, TOTAL_PROFIT_LOSS, TOTAL_SPOT_VALUE = 0
 
 def get_balance():
     global BALANCE_DICT, BALANCE, TOTAL_ASSET_IN_USDT, TOTAL_SPOT_VALUE, TOTAL_ASSET_IN_BTC
+    usdt_idr_ticker = client.ticker_price("USDTIDRT")
     USDT_IDR_RATE = float(usdt_idr_ticker['price'])
     BALANCE = client.balance()
     BALANCE_DICT = {item['walletName']: float(item['balance']) for item in BALANCE}
