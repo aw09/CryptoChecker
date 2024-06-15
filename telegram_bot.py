@@ -195,17 +195,25 @@ async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
     # Load the alerts from the CSV file
     df = pd.read_csv('alerts.csv')
 
+
     # Map the operator strings to actual operator functions
     operators = {'<': op.lt, '>': op.gt, '<=': op.le, '>=': op.ge, '==': op.eq}
 
+    # Get the distinct coins
+    distinct_coins = df['coin'].unique()
+
+    # Get the current prices of the distinct coins
+    current_prices = {}
+    for coin in distinct_coins:
+        if 'Total' in coin:
+            balance_df = pd.read_csv(filename)
+            current_prices[coin] = float(balance_df.tail(1)[coin].item())
+        else:
+            current_prices[coin] = float(client.ticker_price(f"{coin}USDT")['price'])
+
     # Check each alert
     for index, row in df.iterrows():
-        # Get the current price of the coin
-        if 'Total' in row['coin']:
-            balance_df = pd.read_csv(filename)
-            current_price = float(balance_df.tail(1)[row['coin']].item())
-        else:
-            current_price = float(client.ticker_price(f"{row['coin']}USDT")['price'])
+        current_price = current_prices[row['coin']]
 
         # If the current price matches the alert condition, send an alert message and delete the alert
         if operators[row['operator']](current_price, row['price']):
