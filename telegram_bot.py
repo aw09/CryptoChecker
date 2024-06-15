@@ -17,7 +17,7 @@ import operator as op
 filename = 'balance_vs_btc.csv'
 chartname = 'chart.png'
 refresh_time = 3 * 60 # 15 minutes
-wallet_balance = 500
+wallet_balance = 7300
 
 def read_whitelist():
     with open('whitelist.txt', 'r') as file:
@@ -36,7 +36,7 @@ def authorization(func):
 async def updateData(*args, **kwargs):
     total_binance, usdt_idr_rate = binance_balance()
     total_gate = gate_balance()
-    manta_bitget = 325
+    manta_bitget = 0
     manta_price = client.ticker_price("MANTAUSDT")
     total_bitget = manta_bitget * float(manta_price['price'])
     total_usdt = total_binance + total_gate + wallet_balance + total_bitget
