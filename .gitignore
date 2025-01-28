@@ -1,3 +1,5 @@
 *pycache*
 .env
 chart.png
+.venv
+.streamlit/secret.toml
