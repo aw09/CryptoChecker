@@ -9,8 +9,6 @@ from functools import wraps
 from gate_script import get_balance
 
 TELEGRAM_TOKEN = st.secrets["telegram"]["token"]
-filename = 'balance_vs_btc.csv'
-refresh_time = 3 * 60  # 3 minutes
 
 def read_whitelist():
     return st.secrets["whitelist"]["usernames"]
@@ -24,12 +22,10 @@ def authorization(func):
         return await func(update, context, *args, **kwargs)
     return wrapper
 
-async def updateData(*args, **kwargs):
-    return get_balance()
 
 @authorization
 async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    balances = await updateData()
+    balances = get_balance()
     
     message_parts = [f"{datetime.now()}\n"]
     total = balances.pop('total')  # Remove and store total
@@ -44,7 +40,6 @@ async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("info", sendInfo))
-    app.job_queue.run_repeating(updateData, interval=refresh_time, first=0)
     app.run_polling()
 
 if __name__ == '__main__':
