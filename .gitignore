@@ -2,4 +2,4 @@
 .env
 chart.png
 .venv
-.streamlit/secret.toml
+.streamlit/secrets.toml
