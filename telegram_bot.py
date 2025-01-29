@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import textwrap
 from functools import wraps
-from gate_script import get_balance
+from gate_script import get_balance, get_spot_holdings
 import logging
 import asyncio
 
@@ -57,6 +57,55 @@ async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         await update.message.reply_text(f"Error getting balances: {str(e)}")
 
+@authorization
+async def sendHoldings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    print(f"Received holdings command from {update.effective_user.username}")
+
+    try:
+        processing_msg = await update.message.reply_text("Processing...")
+        all_holdings = get_spot_holdings(min_usdt_value=0.5)
+        message_parts = [f"{datetime.now()}\n"]
+        
+        account_total_usdt = {}
+        
+        for account_name, data in all_holdings.items():
+            message_parts.append(f"\n=== {data['name']} ===")
+            if not data['holdings']:
+                message_parts.append("No holdings found")
+                continue
+            
+            account_total = 0
+            for holding in data['holdings']:
+                account_total += holding['value_usdt']
+                message_parts.append(
+                    f"\n{holding['currency']}:"
+                    f"\n  Amount: {format(holding['total'], '.8f')}"
+                    f"\n  Price: {format(holding['price_usdt'], '.4f')} USDT"
+                    f"\n  Value: {format(holding['value_usdt'], '.2f')} USDT"
+                )
+            
+            account_total_usdt[account_name] = account_total
+            message_parts.append(f"\nSubtotal: {format(account_total, '.2f')} USDT")
+        
+        # Add grand total
+        grand_total = sum(account_total_usdt.values())
+        message_parts.append(f"\n=== GRAND TOTAL ===\n{format(grand_total, '.2f')} USDT")
+        
+        # Split and send message
+        full_message = '\n'.join(message_parts)
+        if len(full_message) > 4000:
+            chunks = textwrap.wrap(full_message, 4000)
+            for chunk in chunks:
+                await update.message.reply_text(chunk)
+        else:
+            await update.message.reply_text(full_message)
+        
+        await processing_msg.delete()
+        
+    except Exception as e:
+        logger.error(f"Error getting holdings: {str(e)}")
+        await update.message.reply_text(f"Error getting holdings: {str(e)}")
+
 # Global application instance
 application = None
 
@@ -65,6 +114,7 @@ def main():
     
     app = ApplicationBuilder().token(st.secrets["telegram"]["token"]).build()
     app.add_handler(CommandHandler("info", sendInfo))
+    app.add_handler(CommandHandler("holdings", sendHoldings))  # Add new handler
     
     logger.info("Bot initialization complete, starting polling...")
     app.run_polling(poll_interval=3.0)
