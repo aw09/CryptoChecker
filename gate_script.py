@@ -20,6 +20,17 @@ def get_client(api_key: str, api_secret: str, name: str = "Selected Account"):
         logger.error(f"Error creating Gate.io client: {str(e)}")
         raise
 
+def check_ticker_exists(api_key: str, api_secret: str, currency: str) -> bool:
+    """Check if a ticker exists for the given currency"""
+    try:
+        client_data = get_client(api_key, api_secret)
+        spot_api = gate_api.SpotApi(client_data["client"])
+        ticker = spot_api.list_tickers(currency_pair=f"{currency}_USDT")
+        return len(ticker) > 0 and float(ticker[0].last) > 0
+    except Exception as e:
+        logger.error(f"Error checking ticker: {e}")
+        return False
+
 def get_balance(api_key: str = None, api_secret: str = None):
     try:
         if api_key and api_secret:

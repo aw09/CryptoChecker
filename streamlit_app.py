@@ -5,8 +5,12 @@ import logging
 import threading
 import nest_asyncio
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging with proper format
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    force=True  # Override any existing configuration
+)
 logger = logging.getLogger(__name__)
 
 # Apply nest_asyncio to allow nested event loops
@@ -30,9 +34,6 @@ def main():
     
     # Simple interface
     st.info("Bot is running and monitoring Telegram commands")
-    st.markdown("### Available Commands:")
-    st.markdown("- `/info` - Get account balance information")
-    st.markdown("- `/holdings` - Get detailed holdings information")
 
 if __name__ == "__main__":
     main()

@@ -6,12 +6,17 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotComm
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters, CallbackQueryHandler
 import textwrap
 from functools import wraps
-from gate_script import get_balance, get_spot_holdings
+from gate_script import get_balance, get_spot_holdings, check_ticker_exists
 import logging
 import asyncio
 from db_utils import (register_user, add_api_key, get_user_api_keys, 
                      set_alert, get_user_alerts, delete_api_key, set_selected_api, get_selected_api)
 
+# Configure logging with proper format
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 TELEGRAM_TOKEN = st.secrets["telegram"]["token"]
@@ -133,10 +138,33 @@ async def add_alert_start(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.message.reply_text("Which coin do you want to track? (e.g., BTC)")
     return ALERT_COIN
 
+@authorization
 async def alert_coin_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['coin'] = update.message.text.upper()
-    await update.message.reply_text("Choose condition (< or >):")
-    return ALERT_CONDITION
+    try:
+        coin = update.message.text.upper()
+        logger.info(f"Checking coin: {coin}")
+        
+        # Get selected API for ticker validation
+        selected_api = await get_selected_api(update.effective_user.id)
+        if not selected_api:
+            await update.message.reply_text("Please select an API first using 🔐 My APIs")
+            return ConversationHandler.END
+        
+        # Check if ticker exists
+        logger.info(f"Validating ticker for {coin}/USDT")
+        if not check_ticker_exists(selected_api['api_key'], selected_api['api_secret'], coin):
+            await update.message.reply_text(f"❌ Error: Could not find ticker for {coin}/USDT\nPlease check the coin symbol and try again.")
+            return ConversationHandler.END
+        
+        logger.info(f"Ticker {coin}/USDT exists, proceeding")
+        context.user_data['coin'] = coin
+        await update.message.reply_text("Choose condition (< or >):")
+        return ALERT_CONDITION
+        
+    except Exception as e:
+        logger.error(f"Error in alert_coin_received: {e}")
+        await update.message.reply_text("An error occurred. Please try again.")
+        return ConversationHandler.END
 
 async def alert_condition_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.message.text not in ['<', '>']:
@@ -360,21 +388,31 @@ def main():
         fallbacks=[],
     )
 
-    # Add conversation handler for alerts
+    # Add conversation handler for alerts with both command and button handlers
     alert_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('addalert', add_alert_start)],
+        entry_points=[
+            CommandHandler('addalert', add_alert_start),
+            MessageHandler(filters.Regex('^🎯 Add Alert$'), add_alert_start)
+        ],
         states={
-            ALERT_COIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, alert_coin_received)],
-            ALERT_CONDITION: [MessageHandler(filters.TEXT & ~filters.COMMAND, alert_condition_received)],
-            ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, alert_price_received)],
+            ALERT_COIN: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex('^🎯 Add Alert$'), alert_coin_received)
+            ],
+            ALERT_CONDITION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, alert_condition_received)
+            ],
+            ALERT_PRICE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, alert_price_received)
+            ]
         },
-        fallbacks=[],
+        fallbacks=[CommandHandler('cancel', cancel_alert)],
+        name='alert_conversation'
     )
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", show_main_menu))
+    app.add_handler(alert_conv_handler)  # Move this before the general message handler
     app.add_handler(api_conv_handler)
-    app.add_handler(alert_conv_handler)
     app.add_handler(CommandHandler("myapis", show_my_apis))  # Add this line
     app.add_handler(CommandHandler("selectapi", select_api))
     app.add_handler(CommandHandler("info", sendInfo))
@@ -385,6 +423,10 @@ def main():
 
     logger.info("Bot initialization complete, starting polling...")
     app.run_polling(poll_interval=3.0)
+
+async def cancel_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text('Alert creation cancelled.')
+    return ConversationHandler.END
 
 if __name__ == '__main__':
     # Make sure streamlit is initialized when running directly
