@@ -2,7 +2,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 from db_utils import set_alert, get_user_alerts, get_selected_api
-from gate_script import check_ticker_exists, check_current_price
+from gate_script import check_ticker_exists, check_current_price, get_multiple_prices
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ReplyKeyboardMarkup, KeyboardButton
 import asyncio
 import streamlit as st
@@ -118,44 +118,62 @@ async def check_alerts(bot):
                 await asyncio.sleep(60)
                 continue
             
+            # Group alerts by user to minimize API calls
+            alerts_by_user = {}
             for alert in all_alerts:
+                if alert['user_id'] not in alerts_by_user:
+                    alerts_by_user[alert['user_id']] = []
+                alerts_by_user[alert['user_id']].append(alert)
+            
+            # Process alerts user by user
+            for user_id, user_alerts in alerts_by_user.items():
                 try:
-                    logger.info(f"Checking alert {alert['_id']}")
-                    # Get user's selected API for price checking
-                    selected_api = await get_selected_api(alert['user_id'])
+                    selected_api = await get_selected_api(user_id)
                     if not selected_api:
                         continue
                     
-                    current_price = check_current_price(
+                    # Get all required coins for this user
+                    coins = list(set(alert['coin'] for alert in user_alerts))
+                    
+                    # Get all prices in one API call
+                    prices = get_multiple_prices(
                         selected_api['api_key'],
                         selected_api['api_secret'],
-                        alert['coin']
+                        coins
                     )
                     
-                    condition_met = False
-                    if alert['condition'] == '<' and current_price < alert['price']:
-                        condition_met = True
-                    elif alert['condition'] == '>' and current_price > alert['price']:
-                        condition_met = True
-                    
-                    if condition_met:
-                        message = (
-                            f"🚨 Alert Triggered!\n"
-                            f"Coin: {alert['coin']}\n"
-                            f"Condition: {alert['condition']} {alert['price']}\n"
-                            f"Current Price: {current_price}\n"
-                            f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                        )
+                    # Check alerts with cached prices
+                    for alert in user_alerts:
                         try:
-                            await bot.send_message(chat_id=alert['user_id'], text=message)
-                            # Mark it inactive
-                            db = pymongo.MongoClient(st.secrets["mongodb"]["url"]).crypto_checker
-                            db.alerts.update_one({"_id": alert["_id"]}, {"$set": {"active": False}})
+                            current_price = prices.get(alert['coin'])
+                            if not current_price:
+                                continue
+                            
+                            condition_met = False
+                            if alert['condition'] == '<' and current_price < alert['price']:
+                                condition_met = True
+                            elif alert['condition'] == '>' and current_price > alert['price']:
+                                condition_met = True
+                            
+                            if condition_met:
+                                message = (
+                                    f"🚨 Alert Triggered!\n"
+                                    f"Coin: {alert['coin']}\n"
+                                    f"Condition: {alert['condition']} {alert['price']}\n"
+                                    f"Current Price: {current_price}\n"
+                                    f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                                )
+                                await bot.send_message(chat_id=user_id, text=message)
+                                # Mark it inactive
+                                db = pymongo.MongoClient(st.secrets["mongodb"]["url"]).crypto_checker
+                                db.alerts.update_one({"_id": alert["_id"]}, {"$set": {"active": False}})
+                                
                         except Exception as e:
-                            logger.error(f"Failed to send alert to user {alert['user_id']}: {e}")
-                        
+                            logger.error(f"Error checking alert {alert['_id']}: {e}")
+                            continue
+                            
                 except Exception as e:
-                    logger.error(f"Error checking alert {alert['_id']}: {e}")
+                    logger.error(f"Error processing alerts for user {user_id}: {e}")
                     continue
             
         except Exception as e:

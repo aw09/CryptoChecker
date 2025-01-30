@@ -113,6 +113,30 @@ def check_current_price(api_key, api_secret, coin):
         logger.error(f"Error getting price for {coin}: {e}")
         raise
 
+def get_multiple_prices(api_key: str, api_secret: str, coins: list) -> dict:
+    """Get prices for multiple coins in a single batch"""
+    try:
+        client_data = get_client(api_key, api_secret)
+        spot_api = gate_api.SpotApi(client_data["client"])
+        
+        # Get all USDT pairs in one request
+        all_tickers = spot_api.list_tickers()
+        
+        # Create price lookup dictionary
+        prices = {}
+        for ticker in all_tickers:
+            # Parse currency from pair (e.g., "BTC_USDT" -> "BTC")
+            if ticker.currency_pair.endswith('_USDT'):
+                currency = ticker.currency_pair[:-5]  # Remove _USDT
+                if currency in coins:
+                    prices[currency] = float(ticker.last)
+        
+        return prices
+        
+    except Exception as e:
+        logger.error(f"Error getting multiple prices: {e}")
+        raise
+
 if __name__ == '__main__':
     balances = get_balance()
     print(balances)
