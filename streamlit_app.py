@@ -6,6 +6,8 @@ import logging
 import threading
 import nest_asyncio
 import time
+import socket
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -41,9 +43,20 @@ def run_bot_forever():
             logger.error(f"Bot error: {e}", exc_info=True)
             time.sleep(5)
 
+def get_public_ip():
+    try:
+        response = requests.get('https://api.ipify.org')
+        return response.text
+    except:
+        return "Unable to get public IP"
+
 def main():
     st.set_page_config(page_title="Crypto Checker Bot")
     st.title("Crypto Checker Bot")
+    
+    public_ip = get_public_ip()
+    logger.info(f"Running on Public IP: {public_ip}")
+    print(f"Running on Public IP: {public_ip}")
     
     # Start bot in background thread if not already running
     if 'bot_thread' not in st.session_state:
