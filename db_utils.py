@@ -57,6 +57,17 @@ async def get_user_api_keys(user_id: int) -> List[Dict]:
         print(f"Error getting API keys: {e}")
         return []
 
+async def delete_api_key(user_id: int, api_name: str) -> bool:
+    try:
+        result = users.update_one(
+            {"user_id": user_id},
+            {"$pull": {"api_keys": {"name": api_name}}}
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Error deleting API key: {e}")
+        return False
+
 async def set_alert(user_id: int, coin: str, condition: str, price: float) -> bool:
     try:
         alerts.insert_one({

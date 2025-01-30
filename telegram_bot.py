@@ -2,15 +2,15 @@ import os
 import pandas as pd
 from datetime import datetime
 import streamlit as st
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters, CallbackQueryHandler
 import textwrap
 from functools import wraps
 from gate_script import get_balance, get_spot_holdings
 import logging
 import asyncio
 from db_utils import (register_user, add_api_key, get_user_api_keys, 
-                     set_alert, get_user_alerts)
+                     set_alert, get_user_alerts, delete_api_key)
 
 logger = logging.getLogger(__name__)
 
@@ -197,15 +197,37 @@ async def show_my_apis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text("You haven't added any API keys yet.\nUse /addapi to add one.")
             return
         
+        keyboard = []
+        for api in apis:
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"🗑️ Delete {api['name']}", 
+                    callback_data=f"delete_api_{api['name']}"
+                )
+            ])
+        
         message = "Your API Keys:\n\n"
         for i, api in enumerate(apis, 1):
             message += f"{i}. {api['name']}\n"
             message += f"   Added: {api['added_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
         
-        await update.message.reply_text(message)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(message, reply_markup=reply_markup)
     except Exception as e:
         logger.error(f"Error showing APIs: {e}")
         await update.message.reply_text("Error fetching your API keys.")
+
+async def handle_api_deletion(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    
+    # Extract API name from callback data
+    api_name = query.data.replace("delete_api_", "")
+    
+    if await delete_api_key(query.from_user.id, api_name):
+        await query.edit_message_text(f"Successfully deleted API key: {api_name}")
+    else:
+        await query.edit_message_text(f"Failed to delete API key: {api_name}")
 
 # Global application instance
 application = None
@@ -243,6 +265,7 @@ def main():
     app.add_handler(CommandHandler("myapis", show_my_apis))  # Add this line
     app.add_handler(CommandHandler("info", sendInfo))
     app.add_handler(CommandHandler("holdings", sendHoldings))  # Add new handler
+    app.add_handler(CallbackQueryHandler(handle_api_deletion, pattern="^delete_api_"))  # Add callback query handler for API deletion
     
     logger.info("Bot initialization complete, starting polling...")
     app.run_polling(poll_interval=3.0)
