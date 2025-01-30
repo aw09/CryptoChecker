@@ -70,16 +70,19 @@ def get_application():
     return application
 
 async def run_bot():
-    """Async function to run the bot"""
     global _running
     if _running:
         return
-
     _running = True
     app = get_application()
     try:
-        # Remove manual initialize/start calls
-        await app.run_polling(poll_interval=3.0, drop_pending_updates=True)
+        # Run polling without signals
+        await app.run_polling(
+            poll_interval=3.0,
+            drop_pending_updates=True,
+            stop_signals=None,
+            close_loop=False
+        )
     finally:
         _running = False
 
