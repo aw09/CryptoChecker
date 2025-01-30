@@ -102,3 +102,44 @@ async def get_user_alerts(user_id: int) -> List[Dict]:
     except Exception as e:
         print(f"Error getting alerts: {e}")
         return []
+
+async def set_selected_api(user_id: int, api_name: str) -> bool:
+    try:
+        users.update_one(
+            {"user_id": user_id},
+            {"$set": {"selected_api": api_name}}
+        )
+        return True
+    except Exception as e:
+        print(f"Error setting selected API: {e}")
+        return False
+
+async def get_selected_api(user_id: int) -> Optional[Dict]:
+    try:
+        user = users.find_one({"user_id": user_id})
+        if not user or "selected_api" not in user:
+            return None
+            
+        # Get all API keys and find the selected one
+        api_keys = user.get("api_keys", [])
+        selected_api = next(
+            (api for api in api_keys if api["name"] == user["selected_api"]), 
+            None
+        )
+        
+        if selected_api:
+            # Make sure we're correctly decoding the encrypted values
+            try:
+                return {
+                    "name": selected_api["name"],
+                    "api_key": decrypt_text(selected_api["api_key"]),
+                    "api_secret": decrypt_text(selected_api["api_secret"])
+                }
+            except Exception as e:
+                print(f"Error decrypting API keys: {e}")
+                return None
+                
+        return None
+    except Exception as e:
+        print(f"Error getting selected API: {e}")
+        return None

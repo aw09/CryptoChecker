@@ -10,7 +10,7 @@ from gate_script import get_balance, get_spot_holdings
 import logging
 import asyncio
 from db_utils import (register_user, add_api_key, get_user_api_keys, 
-                     set_alert, get_user_alerts, delete_api_key)
+                     set_alert, get_user_alerts, delete_api_key, set_selected_api, get_selected_api)
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "Commands:\n"
             "/addapi - Add Gate.io API keys\n"
             "/myapis - List your API keys\n"
+            "/selectapi - Select API to use\n"
             "/addalert - Create price alert\n"
             "/alerts - List your alerts\n"
             "/info - Get balance info\n"
@@ -114,11 +115,21 @@ async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     print(f"Received command from {update.effective_user.username}")
 
     try:
+        # Get selected API with debug logging
+        selected_api = await get_selected_api(update.effective_user.id)
+        print(f"Selected API: {selected_api['name'] if selected_api else 'None'}")
+        
+        if not selected_api:
+            await update.message.reply_text("Please select an API first using /selectapi")
+            return
+
         # Send processing message
         processing_msg = await update.message.reply_text("Processing...")
         
-        # Get balances
-        balances = get_balance()
+        # Get balances using selected API
+        print(f"Getting balance for API: {selected_api['name']}")
+        balances = get_balance(api_key=selected_api['api_key'], 
+                             api_secret=selected_api['api_secret'])
         total = balances.pop('total')
         
         # Build message
@@ -145,8 +156,15 @@ async def sendHoldings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     print(f"Received holdings command from {update.effective_user.username}")
 
     try:
+        selected_api = await get_selected_api(update.effective_user.id)
+        if not selected_api:
+            await update.message.reply_text("Please select an API first using /selectapi")
+            return
+
         processing_msg = await update.message.reply_text("Processing...")
-        all_holdings = get_spot_holdings(min_usdt_value=0.5)
+        all_holdings = get_spot_holdings(api_key=selected_api['api_key'],
+                                       api_secret=selected_api['api_secret'],
+                                       min_usdt_value=0.5)
         message_parts = [f"{datetime.now()}\n"]
         
         account_total_usdt = {}
@@ -229,6 +247,44 @@ async def handle_api_deletion(update: Update, context: ContextTypes.DEFAULT_TYPE
     else:
         await query.edit_message_text(f"Failed to delete API key: {api_name}")
 
+@authorization
+async def select_api(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        apis = await get_user_api_keys(update.effective_user.id)
+        if not apis:
+            await update.message.reply_text("You haven't added any API keys yet.\nUse /addapi to add one.")
+            return
+        
+        keyboard = []
+        for api in apis:
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"📌 Select {api['name']}", 
+                    callback_data=f"select_api_{api['name']}"
+                )
+            ])
+        
+        selected_api = await get_selected_api(update.effective_user.id)
+        message = "Select API to use:\n\n"
+        if selected_api:
+            message += f"Currently using: {selected_api['name']}\n\n"
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(message, reply_markup=reply_markup)
+    except Exception as e:
+        logger.error(f"Error showing API selection: {e}")
+        await update.message.reply_text("Error fetching your APIs.")
+
+async def handle_api_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    
+    api_name = query.data.replace("select_api_", "")
+    if await set_selected_api(query.from_user.id, api_name):
+        await query.edit_message_text(f"Successfully selected API: {api_name}")
+    else:
+        await query.edit_message_text(f"Failed to select API: {api_name}")
+
 # Global application instance
 application = None
 
@@ -263,10 +319,12 @@ def main():
     app.add_handler(api_conv_handler)
     app.add_handler(alert_conv_handler)
     app.add_handler(CommandHandler("myapis", show_my_apis))  # Add this line
+    app.add_handler(CommandHandler("selectapi", select_api))
     app.add_handler(CommandHandler("info", sendInfo))
     app.add_handler(CommandHandler("holdings", sendHoldings))  # Add new handler
     app.add_handler(CallbackQueryHandler(handle_api_deletion, pattern="^delete_api_"))  # Add callback query handler for API deletion
-    
+    app.add_handler(CallbackQueryHandler(handle_api_selection, pattern="^select_api_"))
+
     logger.info("Bot initialization complete, starting polling...")
     app.run_polling(poll_interval=3.0)
 

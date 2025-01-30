@@ -1,44 +1,46 @@
 import gate_api
 import streamlit as st
+import logging
 
-def get_all_clients():
-    clients = {}
-    for key in st.secrets["gate_io"]:
-        if key.startswith("account"):
-            configuration = gate_api.Configuration(
-                key=st.secrets["gate_io"][key]["api_key"],
-                secret=st.secrets["gate_io"][key]["api_secret"]
-            )
-            clients[key] = {
-                "client": gate_api.ApiClient(configuration),
-                "name": st.secrets["gate_io"][key]["name"]
-            }
-    return clients
+# Configure logger
+logger = logging.getLogger(__name__)
 
-def get_balance(account_name=None):
-    clients = get_all_clients()
-    
-    if account_name and account_name in clients:
-        wallet_api = gate_api.WalletApi(clients[account_name]["client"])
+def get_client(api_key: str, api_secret: str, name: str = "Selected Account"):
+    """Create a single Gate.io client with given credentials"""
+    try:
+        configuration = gate_api.Configuration(
+            key=api_key,
+            secret=api_secret
+        )
         return {
-            "name": clients[account_name]["name"],
-            "balance": float(wallet_api.get_total_balance().total.amount)
+            "client": gate_api.ApiClient(configuration),
+            "name": name
         }
-    
-    # Get all balances if no specific account is specified
-    balances = {}
-    total = 0
-    for acc_name, client_data in clients.items():
-        wallet_api = gate_api.WalletApi(client_data["client"])
-        balance = float(wallet_api.get_total_balance().total.amount)
-        balances[acc_name] = {
-            "name": client_data["name"],
-            "balance": balance
-        }
-        total += balance
-    
-    balances["total"] = total
-    return balances
+    except Exception as e:
+        logger.error(f"Error creating Gate.io client: {str(e)}")
+        raise
+
+def get_balance(api_key: str = None, api_secret: str = None):
+    try:
+        if api_key and api_secret:
+            client_data = get_client(api_key, api_secret)
+            wallet_api = gate_api.WalletApi(client_data["client"])
+            balance = float(wallet_api.get_total_balance().total.amount)
+            
+            return {
+                "account1": {
+                    "name": client_data["name"],
+                    "balance": balance
+                },
+                "total": balance
+            }
+        else:
+            logger.error("No API credentials provided")
+            raise ValueError("API credentials are required")
+            
+    except Exception as e:
+        logger.error(f"Gate.io API error: {str(e)}")
+        raise
 
 def get_usdt_price(spot_api, currency):
     if currency == 'USDT':
@@ -49,39 +51,12 @@ def get_usdt_price(spot_api, currency):
     except:
         return 0.0
 
-def get_spot_holdings(account_name=None, min_usdt_value=0.5):
-    clients = get_all_clients()
-    
-    if account_name and account_name in clients:
-        spot_api = gate_api.SpotApi(clients[account_name]["client"])
-        balances = spot_api.list_spot_accounts()
-        holdings = []
-        
-        for b in balances:
-            available = float(b.available)
-            locked = float(b.locked)
-            total = available + locked
-            if total > 0:
-                price = get_usdt_price(spot_api, b.currency)
-                usdt_value = total * price
-                if usdt_value >= min_usdt_value:
-                    holdings.append({
-                        "currency": b.currency,
-                        "available": available,
-                        "locked": locked,
-                        "total": total,
-                        "price_usdt": price,
-                        "value_usdt": usdt_value
-                    })
-        
-        return {
-            "name": clients[account_name]["name"],
-            "holdings": sorted(holdings, key=lambda x: x['value_usdt'], reverse=True)
-        }
-    
-    # Get all accounts holdings
-    all_holdings = {}
-    for acc_name, client_data in clients.items():
+def get_spot_holdings(api_key: str = None, api_secret: str = None, min_usdt_value=0.5):
+    try:
+        if not api_key or not api_secret:
+            raise ValueError("API credentials are required")
+            
+        client_data = get_client(api_key, api_secret)
         spot_api = gate_api.SpotApi(client_data["client"])
         balances = spot_api.list_spot_accounts()
         holdings = []
@@ -103,12 +78,16 @@ def get_spot_holdings(account_name=None, min_usdt_value=0.5):
                         "value_usdt": usdt_value
                     })
         
-        all_holdings[acc_name] = {
-            "name": client_data["name"],
-            "holdings": sorted(holdings, key=lambda x: x['value_usdt'], reverse=True)
+        return {
+            "account1": {
+                "name": client_data["name"],
+                "holdings": sorted(holdings, key=lambda x: x['value_usdt'], reverse=True)
+            }
         }
-    
-    return all_holdings
+            
+    except Exception as e:
+        logger.error(f"Gate.io API error: {str(e)}")
+        raise
 
 if __name__ == '__main__':
     balances = get_balance()
