@@ -2,18 +2,17 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 from db_utils import set_alert, get_user_alerts, get_selected_api
-from gate_script import check_ticker_exists
+from gate_script import check_ticker_exists, check_current_price
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ReplyKeyboardMarkup, KeyboardButton
 import asyncio
 import streamlit as st
-from gate_script import check_current_price
 from datetime import datetime
 import pymongo
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname%s - %(message)s'
+    format='%(asctime%s - %(name)s - %(levelname%s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -40,10 +39,13 @@ async def alert_coin_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         logger.info(f"Ticker {coin}/USDT exists, proceeding")
         context.user_data['coin'] = coin
-        keyboard = [[KeyboardButton("<"), KeyboardButton(">")]]
+        current_price = check_current_price(selected_api['api_key'], selected_api['api_secret'], coin)
         await update.message.reply_text(
-            "Choose condition:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+            f"Current price for {coin} is {current_price} USDT.\nPlease choose condition:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("<", callback_data="alert_condition_less"),
+                 InlineKeyboardButton(">", callback_data="alert_condition_greater")]
+            ])
         )
         return ALERT_CONDITION
         
@@ -159,4 +161,4 @@ async def check_alerts(bot):
         except Exception as e:
             logger.error(f"Error in alert checker: {e}")
         
-        await asyncio.sleep(60)  # Wait between checks
+        await asyncio.sleep(st.secrets["alert"]["interval"])
