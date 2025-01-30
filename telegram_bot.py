@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from datetime import datetime
 import streamlit as st
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters, CallbackQueryHandler
 import textwrap
 from functools import wraps
@@ -31,23 +31,76 @@ def authorization(func):
 APIKEY, APISECRET, APINAME = range(3)
 ALERT_COIN, ALERT_CONDITION, ALERT_PRICE = range(3, 6)
 
+async def setup_commands(application):
+    """Setup bot commands in the menu"""
+    commands = [
+        BotCommand("start", "Start the bot and show main menu"),
+        BotCommand("menu", "Show main menu")
+    ]
+    await application.bot.set_my_commands(commands)
+
 @authorization
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if await register_user(user.id, user.username):
-        await update.message.reply_text(
-            "Welcome to Crypto Checker Bot!\n\n"
-            "Commands:\n"
-            "/addapi - Add Gate.io API keys\n"
-            "/myapis - List your API keys\n"
-            "/selectapi - Select API to use\n"
-            "/addalert - Create price alert\n"
-            "/alerts - List your alerts\n"
-            "/info - Get balance info\n"
-            "/holdings - Get holdings info"
-        )
+        await show_main_menu(update, context)
     else:
         await update.message.reply_text("Error registering user. Please try again.")
+
+@authorization
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = [
+        [KeyboardButton("💰 Balance"), KeyboardButton("📊 Holdings")],
+        [KeyboardButton("🔑 Add API"), KeyboardButton("🔐 My APIs")],
+        [KeyboardButton("🎯 Add Alert"), KeyboardButton("🔔 My Alerts")]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        "Welcome to Crypto Checker Bot!\n"
+        "Please select an option:",
+        reply_markup=reply_markup
+    )
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle text messages and menu buttons"""
+    text = update.message.text
+    
+    if text == "💰 Balance":
+        await sendInfo(update, context)
+    elif text == "📊 Holdings":
+        await sendHoldings(update, context)
+    elif text == "🔑 Add API":
+        await add_api_start(update, context)
+    elif text == "🔐 My APIs":
+        await show_my_apis(update, context)
+    elif text == "🎯 Add Alert":
+        await add_alert_start(update, context)
+    elif text == "🔔 My Alerts":
+        await show_alerts(update, context)
+
+@authorization
+async def show_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show user's active alerts"""
+    alerts = await get_user_alerts(update.effective_user.id)
+    if not alerts:
+        await update.message.reply_text("You don't have any active alerts.")
+        return
+    
+    message = "Your Active Alerts:\n\n"
+    for alert in alerts:
+        message += f"🎯 {alert['coin']}: {alert['condition']} {alert['price']} USDT\n"
+    
+    keyboard = []
+    for alert in alerts:
+        keyboard.append([
+            InlineKeyboardButton(
+                f"❌ Delete {alert['coin']} Alert", 
+                callback_data=f"delete_alert_{alert['_id']}"
+            )
+        ])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(message, reply_markup=reply_markup)
 
 async def add_api_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Please send your Gate.io API key:")
@@ -293,6 +346,9 @@ def main():
     
     app = ApplicationBuilder().token(st.secrets["telegram"]["token"]).build()
     
+    # Setup commands menu
+    asyncio.get_event_loop().run_until_complete(setup_commands(app))
+    
     # Add conversation handler for API keys
     api_conv_handler = ConversationHandler(
         entry_points=[CommandHandler('addapi', add_api_start)],
@@ -316,12 +372,14 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("menu", show_main_menu))
     app.add_handler(api_conv_handler)
     app.add_handler(alert_conv_handler)
     app.add_handler(CommandHandler("myapis", show_my_apis))  # Add this line
     app.add_handler(CommandHandler("selectapi", select_api))
     app.add_handler(CommandHandler("info", sendInfo))
     app.add_handler(CommandHandler("holdings", sendHoldings))  # Add new handler
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_api_deletion, pattern="^delete_api_"))  # Add callback query handler for API deletion
     app.add_handler(CallbackQueryHandler(handle_api_selection, pattern="^select_api_"))
 
