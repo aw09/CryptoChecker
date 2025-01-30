@@ -1,7 +1,8 @@
 import streamlit as st
 import asyncio
-from telegram_bot import main as run_bot, stop as stop_bot
+from telegram_bot import main as run_bot
 import logging
+import threading
 import nest_asyncio
 
 # Configure logging
@@ -11,46 +12,27 @@ logger = logging.getLogger(__name__)
 # Apply nest_asyncio to allow nested event loops
 nest_asyncio.apply()
 
-def run_bot_in_thread():
+def run_bot_forever():
     try:
         asyncio.run(run_bot())
     except Exception as e:
-        logger.error(f"Bot thread error: {e}")
+        logger.error(f"Bot error: {e}")
 
 def main():
     st.set_page_config(page_title="Crypto Checker Bot")
-    st.title("Crypto Checker Bot is running")
+    st.title("Crypto Checker Bot")
     
-    # Initialize session state
-    if 'bot_status' not in st.session_state:
-        st.session_state.bot_status = 'stopped'
-        st.session_state.bot_thread = None
+    # Start bot in background thread if not already running
+    if 'bot_thread' not in st.session_state:
+        thread = threading.Thread(target=run_bot_forever, daemon=True)
+        thread.start()
+        st.session_state.bot_thread = thread
     
-    # Add status indicators
-    status = st.empty()
-    
-    # Add start/stop button
-    if st.button('Start/Stop Bot'):
-        if st.session_state.bot_status == 'running':
-            try:
-                asyncio.run(stop_bot())
-                st.session_state.bot_status = 'stopped'
-                status.warning("Bot stopped")
-            except Exception as e:
-                status.error(f"Error stopping bot: {str(e)}")
-        else:
-            st.session_state.bot_status = 'running'
-            
-    # Handle bot status
-    if st.session_state.bot_status == 'running':
-        status.success("Bot is active and monitoring...")
-        if st.session_state.bot_thread is None:
-            import threading
-            thread = threading.Thread(target=run_bot_in_thread, daemon=True)
-            thread.start()
-            st.session_state.bot_thread = thread
-    else:
-        status.info("Bot is stopped. Click the button to start.")
+    # Simple interface
+    st.info("Bot is running and monitoring Telegram commands")
+    st.markdown("### Available Commands:")
+    st.markdown("- `/info` - Get account balance information")
+    st.markdown("- `/holdings` - Get detailed holdings information")
 
 if __name__ == "__main__":
     main()
