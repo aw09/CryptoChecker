@@ -98,6 +98,9 @@ async def set_alert(user_id: int, coin: str, condition: str, price: float) -> bo
 
 async def get_user_alerts(user_id: int) -> List[Dict]:
     try:
+        if user_id is None:
+            all_alerts = alerts.find({"active": True})  # Retrieve all active alerts
+            return list(all_alerts)
         return list(alerts.find({"user_id": user_id, "active": True}))
     except Exception as e:
         print(f"Error getting alerts: {e}")

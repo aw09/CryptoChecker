@@ -93,17 +93,36 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     elif text == "🔔 My Alerts":
         await show_alerts(update, context)
 
-# Global application instance
+# Global variables
 application = None
+_initialized = False
+_running = False
 
-def main():
-    logger.info("Starting Telegram bot...")
-    
-    app = ApplicationBuilder().token(st.secrets["telegram"]["token"]).build()
-    
-    # Setup commands menu
-    asyncio.get_event_loop().run_until_complete(setup_commands(app))
-    
+def get_application():
+    global application, _initialized
+    if application is None:
+        application = ApplicationBuilder().token(st.secrets["telegram"]["token"]).build()
+        if not _initialized:
+            setup_handlers(application)
+            _initialized = True
+    return application
+
+async def run_bot():
+    """Async function to run the bot"""
+    global _running
+    if _running:
+        return
+
+    _running = True
+    app = get_application()
+    try:
+        # Remove manual initialize/start calls
+        await app.run_polling(poll_interval=3.0, drop_pending_updates=True)
+    finally:
+        _running = False
+
+def setup_handlers(app):
+    """Setup all handlers for the application"""
     # Add conversation handler for API keys
     api_conv_handler = ConversationHandler(
         entry_points=[
@@ -141,17 +160,8 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", show_main_menu))
-    app.add_handler(alert_conv_handler)  # Move this before the general message handler
+    app.add_handler(alert_conv_handler)
     app.add_handler(api_conv_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(CallbackQueryHandler(handle_api_deletion, pattern="^delete_api_"))  # Add callback query handler for API deletion
+    app.add_handler(CallbackQueryHandler(handle_api_deletion, pattern="^delete_api_"))
     app.add_handler(CallbackQueryHandler(handle_api_selection, pattern="^select_api_"))
-
-    logger.info("Bot initialization complete, starting polling...")
-    app.run_polling(poll_interval=3.0)
-
-if __name__ == '__main__':
-    # Make sure streamlit is initialized when running directly
-    if not hasattr(st, 'secrets'):
-        st.runtime.get_instance().get_cached_resource("secrets")
-    main()

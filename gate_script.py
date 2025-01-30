@@ -100,6 +100,19 @@ def get_spot_holdings(api_key: str = None, api_secret: str = None, min_usdt_valu
         logger.error(f"Gate.io API error: {str(e)}")
         raise
 
+def check_current_price(api_key, api_secret, coin):
+    """Get current price for a coin"""
+    try:
+        client_data = get_client(api_key, api_secret)
+        spot_api = gate_api.SpotApi(client_data["client"])
+        ticker = spot_api.list_tickers(currency_pair=f"{coin}_USDT")
+        if ticker and len(ticker) > 0:
+            return float(ticker[0].last)
+        raise ValueError(f"No ticker found for {coin}_USDT")
+    except Exception as e:
+        logger.error(f"Error getting price for {coin}: {e}")
+        raise
+
 if __name__ == '__main__':
     balances = get_balance()
     print(balances)

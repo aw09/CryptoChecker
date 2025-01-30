@@ -1,26 +1,45 @@
 import streamlit as st
 import asyncio
-from telegram_bot import main as run_bot
+from telegram_bot import get_application, run_bot
+from handlers.alert_handlers import check_alerts
 import logging
 import threading
 import nest_asyncio
+import time
 
-# Configure logging with proper format
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    force=True  # Override any existing configuration
+    force=True
 )
 logger = logging.getLogger(__name__)
 
 # Apply nest_asyncio to allow nested event loops
 nest_asyncio.apply()
 
-def run_bot_forever():
+async def run_bot_and_workers():
+    """Run both the bot and alert checker worker"""
+    app = get_application()
+    
     try:
-        asyncio.run(run_bot())
+        # Run both the bot and alert checker concurrently
+        await asyncio.gather(
+            run_bot(),
+            check_alerts(app.bot)
+        )
     except Exception as e:
-        logger.error(f"Bot error: {e}")
+        logger.error(f"Error in bot or worker: {e}", exc_info=True)
+        raise
+
+def run_bot_forever():
+    # Remove extra loop creation and closing
+    while True:
+        try:
+            asyncio.run(run_bot_and_workers())
+        except Exception as e:
+            logger.error(f"Bot error: {e}", exc_info=True)
+            time.sleep(5)
 
 def main():
     st.set_page_config(page_title="Crypto Checker Bot")
