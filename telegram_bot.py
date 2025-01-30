@@ -189,6 +189,24 @@ async def sendHoldings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         logger.error(f"Error getting holdings: {str(e)}")
         await update.message.reply_text(f"Error getting holdings: {str(e)}")
 
+@authorization
+async def show_my_apis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        apis = await get_user_api_keys(update.effective_user.id)
+        if not apis:
+            await update.message.reply_text("You haven't added any API keys yet.\nUse /addapi to add one.")
+            return
+        
+        message = "Your API Keys:\n\n"
+        for i, api in enumerate(apis, 1):
+            message += f"{i}. {api['name']}\n"
+            message += f"   Added: {api['added_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
+        
+        await update.message.reply_text(message)
+    except Exception as e:
+        logger.error(f"Error showing APIs: {e}")
+        await update.message.reply_text("Error fetching your API keys.")
+
 # Global application instance
 application = None
 
@@ -222,6 +240,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(api_conv_handler)
     app.add_handler(alert_conv_handler)
+    app.add_handler(CommandHandler("myapis", show_my_apis))  # Add this line
     app.add_handler(CommandHandler("info", sendInfo))
     app.add_handler(CommandHandler("holdings", sendHoldings))  # Add new handler
     
