@@ -3,12 +3,14 @@ import pandas as pd
 from datetime import datetime
 import streamlit as st
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 import textwrap
 from functools import wraps
 from gate_script import get_balance, get_spot_holdings
 import logging
 import asyncio
+from db_utils import (register_user, add_api_key, get_user_api_keys, 
+                     set_alert, get_user_alerts)
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,87 @@ def authorization(func):
         return await func(update, context, *args, **kwargs)
     return wrapper
 
+# Add states for conversation
+APIKEY, APISECRET, APINAME = range(3)
+ALERT_COIN, ALERT_CONDITION, ALERT_PRICE = range(3, 6)
+
+@authorization
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if await register_user(user.id, user.username):
+        await update.message.reply_text(
+            "Welcome to Crypto Checker Bot!\n\n"
+            "Commands:\n"
+            "/addapi - Add Gate.io API keys\n"
+            "/myapis - List your API keys\n"
+            "/addalert - Create price alert\n"
+            "/alerts - List your alerts\n"
+            "/info - Get balance info\n"
+            "/holdings - Get holdings info"
+        )
+    else:
+        await update.message.reply_text("Error registering user. Please try again.")
+
+async def add_api_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Please send your Gate.io API key:")
+    return APIKEY
+
+async def add_api_key_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['api_key'] = update.message.text
+    await update.message.reply_text("Now send your API secret:")
+    return APISECRET
+
+async def add_api_secret_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['api_secret'] = update.message.text
+    await update.message.reply_text("Give a name for this API (e.g., 'Main Account'):")
+    return APINAME
+
+async def add_api_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if await add_api_key(
+        update.effective_user.id,
+        update.message.text,
+        context.user_data['api_key'],
+        context.user_data['api_secret']
+    ):
+        await update.message.reply_text("API keys added successfully!")
+    else:
+        await update.message.reply_text("Error adding API keys. Please try again.")
+    return ConversationHandler.END
+
+@authorization
+async def add_alert_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Which coin do you want to track? (e.g., BTC)")
+    return ALERT_COIN
+
+async def alert_coin_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['coin'] = update.message.text.upper()
+    await update.message.reply_text("Choose condition (< or >):")
+    return ALERT_CONDITION
+
+async def alert_condition_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.message.text not in ['<', '>']:
+        await update.message.reply_text("Please send either < or >")
+        return ALERT_CONDITION
+    context.user_data['condition'] = update.message.text
+    await update.message.reply_text("Enter price in USDT:")
+    return ALERT_PRICE
+
+async def alert_price_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        price = float(update.message.text)
+        if await set_alert(
+            update.effective_user.id,
+            context.user_data['coin'],
+            context.user_data['condition'],
+            price
+        ):
+            await update.message.reply_text("Alert set successfully!")
+        else:
+            await update.message.reply_text("Error setting alert. Please try again.")
+    except ValueError:
+        await update.message.reply_text("Please enter a valid number")
+        return ALERT_PRICE
+    return ConversationHandler.END
 
 @authorization
 async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -113,6 +196,32 @@ def main():
     logger.info("Starting Telegram bot...")
     
     app = ApplicationBuilder().token(st.secrets["telegram"]["token"]).build()
+    
+    # Add conversation handler for API keys
+    api_conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('addapi', add_api_start)],
+        states={
+            APIKEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_api_key_received)],
+            APISECRET: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_api_secret_received)],
+            APINAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_api_name_received)],
+        },
+        fallbacks=[],
+    )
+
+    # Add conversation handler for alerts
+    alert_conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('addalert', add_alert_start)],
+        states={
+            ALERT_COIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, alert_coin_received)],
+            ALERT_CONDITION: [MessageHandler(filters.TEXT & ~filters.COMMAND, alert_condition_received)],
+            ALERT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, alert_price_received)],
+        },
+        fallbacks=[],
+    )
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(api_conv_handler)
+    app.add_handler(alert_conv_handler)
     app.add_handler(CommandHandler("info", sendInfo))
     app.add_handler(CommandHandler("holdings", sendHoldings))  # Add new handler
     

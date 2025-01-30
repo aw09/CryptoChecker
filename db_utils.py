@@ -1,0 +1,80 @@
+import pymongo
+import streamlit as st
+from datetime import datetime
+from typing import Dict, List, Optional
+
+client = pymongo.MongoClient(st.secrets["mongodb"]["url"])
+db = client.crypto_checker
+
+# Collections
+users = db.users
+alerts = db.alerts
+
+async def register_user(user_id: int, username: str) -> bool:
+    try:
+        users.update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "user_id": user_id,
+                    "username": username,
+                    "registered_at": datetime.now(),
+                    "api_keys": []
+                }
+            },
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        print(f"Error registering user: {e}")
+        return False
+
+async def add_api_key(user_id: int, name: str, api_key: str, api_secret: str) -> bool:
+    try:
+        users.update_one(
+            {"user_id": user_id},
+            {
+                "$push": {
+                    "api_keys": {
+                        "name": name,
+                        "api_key": api_key,
+                        "api_secret": api_secret,
+                        "added_at": datetime.now()
+                    }
+                }
+            }
+        )
+        return True
+    except Exception as e:
+        print(f"Error adding API key: {e}")
+        return False
+
+async def get_user_api_keys(user_id: int) -> List[Dict]:
+    try:
+        user = users.find_one({"user_id": user_id})
+        return user.get("api_keys", []) if user else []
+    except Exception as e:
+        print(f"Error getting API keys: {e}")
+        return []
+
+async def set_alert(user_id: int, coin: str, condition: str, price: float) -> bool:
+    try:
+        alerts.insert_one({
+            "user_id": user_id,
+            "coin": coin.upper(),
+            "condition": condition,  # ">" or "<"
+            "price": price,
+            "created_at": datetime.now(),
+            "active": True
+        })
+        return True
+    except Exception as e:
+        print(f"Error setting alert: {e}")
+        return False
+
+async def get_user_alerts(user_id: int) -> List[Dict]:
+    try:
+        return list(alerts.find({"user_id": user_id, "active": True}))
+    except Exception as e:
+        print(f"Error getting alerts: {e}")
+        return []
