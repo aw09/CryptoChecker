@@ -291,6 +291,89 @@ def redeem_from_earn(api_key: str, api_secret: str, currency: str, amount: float
         logger.error(f"Gate.io Earn redemption error: {str(e)}")
         raise
 
+def get_trading_pair_info(spot_api, currency: str):
+    """Get trading pair information including minimum sizes"""
+    try:
+        pairs = spot_api.list_currency_pairs()
+        for pair in pairs:
+            if pair.id == f"{currency}_USDT":
+                return {
+                    "min_amount": float(pair.min_base_amount),
+                    "min_quote_amount": float(pair.min_quote_amount),
+                    "precision": int(pair.amount_precision)
+                }
+        raise ValueError(f"Trading pair {currency}_USDT not found")
+    except Exception as e:
+        logger.error(f"Error getting trading pair info: {e}")
+        raise
+
+def create_spot_order(api_key: str, api_secret: str, currency: str, amount: float, side: str, price: float = None):
+    """Create a spot order (buy/sell) on Gate.io"""
+    try:
+        if not api_key or not api_secret:
+            raise ValueError("API credentials are required")
+        
+        if side not in ['buy', 'sell']:
+            raise ValueError("Side must be 'buy' or 'sell'")
+            
+        client_data = get_client(api_key, api_secret)
+        spot_api = gate_api.SpotApi(client_data["client"])
+        
+        # Get trading pair information
+        pair_info = get_trading_pair_info(spot_api, currency)
+        
+        # For market buy orders, amount should be in quote currency (USDT)
+        # For all other orders, amount should be in base currency
+        is_market_buy = side == 'buy' and price is None
+        
+        if is_market_buy:
+            # For market buy, amount is in USDT, so we don't need to validate base currency minimum
+            formatted_amount = "{:.8f}".format(amount).rstrip('0').rstrip('.')
+        else:
+            # For all other orders, validate and format base currency amount
+            if amount < pair_info['min_amount']:
+                raise ValueError(f"Order size {amount} {currency} is too small. Minimum is {pair_info['min_amount']} {currency}")
+            amount = round(amount, pair_info['precision'])
+            formatted_amount = "{:.8f}".format(amount).rstrip('0').rstrip('.')
+        
+        # Create order
+        order = gate_api.Order(
+            currency_pair=f"{currency}_USDT",
+            side=side,
+            amount=formatted_amount,
+            price=str(price) if price else None,
+            type='limit' if price else 'market',
+            time_in_force='gtc' if price else 'ioc'
+        )
+        
+        # Submit order
+        result = spot_api.create_order(order)
+        
+        return {
+            "status": "success",
+            "currency": currency,
+            "side": side,
+            "amount": amount,
+            "price": price,
+            "order_id": result.id,
+            "created_at": result.create_time_ms
+        }
+            
+    except Exception as e:
+        logger.error(f"Gate.io Spot trading error: {str(e)}")
+        raise
+
+def buy_spot(api_key: str, api_secret: str, currency: str, amount: float, price: float = None):
+    """Buy currency in spot market
+    For market orders, amount should be in USDT
+    For limit orders, amount should be in the base currency
+    """
+    return create_spot_order(api_key, api_secret, currency, amount, 'buy', price)
+
+def sell_spot(api_key: str, api_secret: str, currency: str, amount: float, price: float = None):
+    """Sell currency in spot market"""
+    return create_spot_order(api_key, api_secret, currency, amount, 'sell', price)
+
 # Update the main block to test the new functionality
 if __name__ == '__main__':
     from dotenv import load_dotenv
@@ -302,19 +385,26 @@ if __name__ == '__main__':
     API_SECRET = os.getenv('GATE_API_SECRET')
 
     try:
-        # Check earn balances before redemption
-        balances = get_earn_balances(API_KEY, API_SECRET)
-        print("Earn balances:", balances)
-
-        # Test redeeming all BTC from earn
-        result = redeem_from_earn(API_KEY, API_SECRET, "BTC", redeem_all=True)
-        print("Redemption result:", result)
+        # Get minimum amount for BTC
+        client_data = get_client(API_KEY, API_SECRET)
+        spot_api = gate_api.SpotApi(client_data["client"])
+        pair_info = get_trading_pair_info(spot_api, "BTC")
+        min_amount = pair_info['min_amount']
         
-        # Check updated earn balances after redemption
-        balances = get_earn_balances(API_KEY, API_SECRET)
-        print("\nUpdated earn balances:", balances)
+        print(f"Minimum BTC amount: {min_amount}")
+        
+        # Example: Buy BTC with 10 USDT at market price
+        buy_result = buy_spot(API_KEY, API_SECRET, "BTC", 10.0)  # Amount in USDT for market buy
+        print("Buy result:", buy_result)
+        
+        # Example: Buy 0.0001 BTC at limit price
+        # buy_result = buy_spot(API_KEY, API_SECRET, "BTC", 0.0001, price=30000)  # Amount in BTC for limit buy
+        # print("Buy result:", buy_result)
+
+        # sell_result = sell_spot(API_KEY, API_SECRET, "BTC", 0.0001)
+        # print("Sell result:", sell_result)
         
     except Exception as e:
         print(f"Error: {e}")
-        logger.error(f"Redemption error: {str(e)}")
+        logger.error(f"Spot trading error: {str(e)}")
 

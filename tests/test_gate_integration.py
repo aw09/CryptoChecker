@@ -3,7 +3,7 @@ import pytest
 from dotenv import load_dotenv
 from gate_script import (
     get_balance, get_spot_holdings, check_current_price,
-    get_multiple_prices, get_earn_balances
+    get_multiple_prices, get_earn_balances, buy_spot, sell_spot
 )
 
 # Load environment variables from .env file
@@ -59,3 +59,24 @@ def test_real_earn_balances():
     result = get_earn_balances(API_KEY, API_SECRET)
     assert 'account1' in result
     assert 'holdings' in result['account1']
+
+def test_real_spot_trading():
+    """Test real spot trading with small amounts"""
+    # Buy small amount of BTC with USDT
+    buy_result = buy_spot(API_KEY, API_SECRET, "BTC", 10.0)  # Buy $10 worth of BTC
+    assert buy_result['status'] == "success"
+    assert buy_result['currency'] == "BTC"
+    assert buy_result['side'] == "buy"
+    assert buy_result['amount'] == 10.0  # Amount in USDT
+    
+    # Get the bought amount from spot holdings
+    holdings = get_spot_holdings(API_KEY, API_SECRET)
+    btc_holding = next((h for h in holdings['account1']['holdings'] if h['currency'] == 'BTC'), None)
+    assert btc_holding is not None
+    
+    # Sell the same amount
+    if btc_holding:
+        sell_result = sell_spot(API_KEY, API_SECRET, "BTC", btc_holding['available'])
+        assert sell_result['status'] == "success"
+        assert sell_result['currency'] == "BTC"
+        assert sell_result['side'] == "sell"

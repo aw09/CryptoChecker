@@ -4,7 +4,8 @@ import gate_api
 from gate_script import (
     get_client, check_ticker_exists, get_balance, get_usdt_price,
     get_spot_holdings, check_current_price, get_multiple_prices,
-    get_earn_balances, redeem_from_earn, get_lending_rates
+    get_earn_balances, redeem_from_earn, get_lending_rates,
+    buy_spot, sell_spot, get_trading_pair_info
 )
 
 # Test constants
@@ -156,6 +157,76 @@ def test_get_lending_rates(mock_gate_api):
     assert rates["BTC"]["min_amount"] == 0.00001
     assert rates["BTC"]["max_amount"] == 120000000
 
+def test_buy_spot(mock_gate_api):
+    # Mock pair info
+    mock_pair = Mock()
+    mock_pair.id = "BTC_USDT"
+    mock_pair.min_base_amount = "0.00001"
+    mock_pair.min_quote_amount = "1"
+    mock_pair.amount_precision = "6"
+    mock_gate_api['spot'].return_value.list_currency_pairs.return_value = [mock_pair]
+    
+    # Mock order result
+    mock_result = Mock()
+    mock_result.id = "12345"
+    mock_result.create_time_ms = 1738080416173
+    mock_gate_api['spot'].return_value.create_order.return_value = mock_result
+    
+    # Test market buy (amount in USDT)
+    result = buy_spot(TEST_API_KEY, TEST_API_SECRET, "BTC", 10.0)  # Buy $10 worth of BTC
+    assert result['status'] == "success"
+    assert result['currency'] == "BTC"
+    assert result['side'] == "buy"
+    assert result['amount'] == 10.0  # Amount in USDT for market buy
+    assert result['price'] is None
+    assert result['order_id'] == "12345"
+    assert result['created_at'] == 1738080416173
+    
+    # Test limit buy (amount in BTC)
+    result = buy_spot(TEST_API_KEY, TEST_API_SECRET, "BTC", 0.0001, price=30000.0)
+    assert result['status'] == "success"
+    assert result['currency'] == "BTC"
+    assert result['side'] == "buy"
+    assert result['amount'] == 0.0001  # Amount in BTC for limit buy
+    assert result['price'] == 30000.0
+    assert result['order_id'] == "12345"
+    assert result['created_at'] == 1738080416173
+
+def test_sell_spot(mock_gate_api):
+    # Mock pair info
+    mock_pair = Mock()
+    mock_pair.id = "BTC_USDT"
+    mock_pair.min_base_amount = "0.00001"
+    mock_pair.min_quote_amount = "1"
+    mock_pair.amount_precision = "6"
+    mock_gate_api['spot'].return_value.list_currency_pairs.return_value = [mock_pair]
+    
+    # Mock order result
+    mock_result = Mock()
+    mock_result.id = "12345"
+    mock_result.create_time_ms = 1738080416173
+    mock_gate_api['spot'].return_value.create_order.return_value = mock_result
+    
+    # Test market sell (amount in BTC)
+    result = sell_spot(TEST_API_KEY, TEST_API_SECRET, "BTC", 0.0001)
+    assert result['status'] == "success"
+    assert result['currency'] == "BTC"
+    assert result['side'] == "sell"
+    assert result['amount'] == 0.0001
+    assert result['price'] is None
+    assert result['order_id'] == "12345"
+    assert result['created_at'] == 1738080416173
+    
+    # Test limit sell (amount in BTC)
+    result = sell_spot(TEST_API_KEY, TEST_API_SECRET, "BTC", 0.0001, price=30000.0)
+    assert result['status'] == "success"
+    assert result['currency'] == "BTC"
+    assert result['side'] == "sell"
+    assert result['amount'] == 0.0001
+    assert result['price'] == 30000.0
+    assert result['order_id'] == "12345"
+    assert result['created_at'] == 1738080416173
+
 def test_error_handling():
     with pytest.raises(ValueError):
         get_balance()
@@ -165,3 +236,18 @@ def test_error_handling():
     
     with pytest.raises(ValueError):
         get_earn_balances()
+
+def test_get_trading_pair_info(mock_gate_api):
+    mock_pair = Mock()
+    mock_pair.id = "BTC_USDT"
+    mock_pair.min_base_amount = "0.00001"
+    mock_pair.min_quote_amount = "1"
+    mock_pair.amount_precision = "6"
+    
+    mock_gate_api['spot'].return_value.list_currency_pairs.return_value = [mock_pair]
+    
+    spot_api = mock_gate_api['spot'].return_value
+    info = get_trading_pair_info(spot_api, "BTC")
+    assert info['min_amount'] == 0.00001
+    assert info['min_quote_amount'] == 1.0
+    assert info['precision'] == 6
