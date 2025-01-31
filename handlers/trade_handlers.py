@@ -262,7 +262,7 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             context.user_data['trade_type'] = 'buy'
             context.user_data['awaiting_custom_coin'] = False
             
-            selected_api = get_selected_api()  # Remove await since get_selected_api is not async
+            selected_api = await get_selected_api(update.effective_user.id)
             if not selected_api:
                 await update.message.reply_text("Please select an API first using 🔐 My APIs")
                 return ConversationHandler.END
@@ -403,7 +403,7 @@ async def execute_sell_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     try:
-        api_data = get_selected_api()
+        api_data = await get_selected_api(update.effective_user.id)
         if not api_data:
             await query.edit_message_text("No API selected. Please select an API first.")
             return

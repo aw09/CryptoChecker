@@ -287,7 +287,7 @@ async def refresh_earn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await query.answer()
     
     try:
-        api_data = get_selected_api()
+        api_data = await get_selected_api(update.effective_user.id)
         if not api_data:
             await query.edit_message_text("No API selected. Please select an API first.")
             return
@@ -340,7 +340,7 @@ async def handle_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Extract currency from callback data (format: "redeem_BTC")
         currency = query.data.split('_')[1]
-        api_data = get_selected_api()
+        api_data = await get_selected_api(update.effective_user.id)
         
         if not api_data:
             await query.edit_message_text("No API selected. Please select an API first.")
@@ -385,7 +385,7 @@ async def handle_lend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Extract currency from callback data (format: "lend_BTC")
         currency = query.data.split('_')[1]
-        api_data = get_selected_api()
+        api_data = await get_selected_api(update.effective_user.id)
         
         if not api_data:
             await query.edit_message_text("No API selected. Please select an API first.")
