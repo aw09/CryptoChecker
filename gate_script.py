@@ -137,6 +137,50 @@ def get_multiple_prices(api_key: str, api_secret: str, coins: list) -> dict:
         logger.error(f"Error getting multiple prices: {e}")
         raise
 
+def get_earn_balances(api_key: str = None, api_secret: str = None):
+    """Get balances from Gate.io Earn products"""
+    try:
+        if not api_key or not api_secret:
+            raise ValueError("API credentials are required")
+            
+        client_data = get_client(api_key, api_secret)
+        earn_uni_api = gate_api.EarnUniApi(client_data["client"])
+        spot_api = gate_api.SpotApi(client_data["client"])
+        
+        # Get all earn positions using the correct method name
+        earn_uni_records = earn_uni_api.list_user_uni_lends()
+        holdings = []
+        
+        for record in earn_uni_records:
+            amount = float(record.amount)
+            if amount > 0:
+                # Get current USDT price for the currency
+                price = get_usdt_price(spot_api, record.currency)
+                usdt_value = amount * price
+                
+                holdings.append({
+                    "currency": record.currency,
+                    "amount": amount,
+                    "frozen_amount": float(record.frozen_amount),
+                    "interest_status": record.interest_status,
+                    "min_rate": float(record.min_rate),
+                    "create_time": record.create_time,
+                    "update_time": record.update_time,
+                    "price_usdt": price,
+                    "value_usdt": usdt_value
+                })
+        
+        return {
+            "account1": {
+                "name": client_data["name"],
+                "holdings": sorted(holdings, key=lambda x: x['value_usdt'], reverse=True)
+            }
+        }
+            
+    except Exception as e:
+        logger.error(f"Gate.io Earn API error: {str(e)}")
+        raise
+
 if __name__ == '__main__':
     balances = get_balance()
     print(balances)
