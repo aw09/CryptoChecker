@@ -428,9 +428,9 @@ async def execute_sell_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         results.append(f"❌ Failed to redeem {currency}: {str(e)}")
                 
                 # Wait message for earn redemption
-                results.append("⏳ Waiting for earn redemptions to process (2 minutes)...")
+                results.append("⏳ Waiting for earn redemptions to process (30 seconds)...")
                 await status_message.edit_text("\n".join(results))
-                await asyncio.sleep(120)  # Wait 2 minutes for redemptions to process
+                await asyncio.sleep(30)  # Wait 30 seconds for earn redemptions to process
         except Exception as e:
             results.append(f"❌ Error checking earn positions: {str(e)}")
 
