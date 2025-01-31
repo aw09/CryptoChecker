@@ -22,7 +22,9 @@ from handlers.api_handlers import (
     handle_api_selection, show_api_detail, back_to_apis,
     APIKEY, APISECRET, APINAME
 )
-from handlers.balance_handlers import sendInfo, sendHoldings
+from handlers.balance_handlers import (
+    sendInfo, sendHoldings, refresh_balance, refresh_holdings
+)
 from menu_handlers import show_main_menu, start, handle_message
 
 # Configure logging with proper format
@@ -132,4 +134,7 @@ def setup_handlers(app):
     app.add_handler(CallbackQueryHandler(show_api_detail, pattern="^api_detail_"))
     app.add_handler(CallbackQueryHandler(handle_api_deletion, pattern="^delete_api_"))
     app.add_handler(CallbackQueryHandler(handle_api_selection, pattern="^select_api_"))
+    app.add_handler(CallbackQueryHandler(refresh_balance, pattern="^refresh_balance$"))  # Add this line
+    app.add_handler(CallbackQueryHandler(refresh_holdings, pattern="^refresh_holdings$"))
     app.add_handler(CallbackQueryHandler(back_to_apis, pattern="^back_to_apis$"))
+
