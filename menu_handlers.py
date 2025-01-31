@@ -19,14 +19,15 @@ from handlers.api_handlers import (
     add_api_start,
     show_my_apis,
 )
-from handlers.balance_handlers import sendInfo, sendHoldings
+from handlers.balance_handlers import sendInfo, sendHoldings, sendEarn
 
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
         [KeyboardButton("💰 Balance"), KeyboardButton("📊 Holdings")],
-        [KeyboardButton("🔑 Add API"), KeyboardButton("🔐 My APIs")],
-        [KeyboardButton("🎯 Add Alert"), KeyboardButton("🔔 My Alerts")],
+        [KeyboardButton("💎 Earn"), KeyboardButton("🎯 Add Alert")],
+        [KeyboardButton("🔔 My Alerts"), KeyboardButton("🔑 Add API")],
+        [KeyboardButton("🔐 My APIs")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
@@ -52,6 +53,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await sendInfo(update, context)
     elif text == "📊 Holdings":
         await sendHoldings(update, context)
+    elif text == "💎 Earn":
+        await sendEarn(update, context)
     elif text == "🔑 Add API":
         await add_api_start(update, context)
     elif text == "🔐 My APIs":

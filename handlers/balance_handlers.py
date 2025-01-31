@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from gate_script import get_balance, get_spot_holdings
+from gate_script import get_balance, get_spot_holdings, get_earn_balances
 from db_utils import get_selected_api
 import textwrap
 
@@ -172,3 +172,91 @@ async def refresh_holdings(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = update.callback_query
     await query.answer()
     await sendHoldings(update, context)
+
+async def sendEarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    print(f"Received earn command from {update.effective_user.username}")
+    is_callback = bool(update.callback_query)
+
+    try:
+        selected_api = await get_selected_api(update.effective_user.id)
+        if not selected_api:
+            message = "Please select an API first using 🔐 My APIs"
+            if is_callback:
+                await update.callback_query.edit_message_text(message)
+            else:
+                await update.message.reply_text(message)
+            return
+
+        processing_msg = None if is_callback else await update.message.reply_text("Processing...")
+        
+        earn_balances = get_earn_balances(api_key=selected_api['api_key'],
+                                        api_secret=selected_api['api_secret'])
+
+        message_parts = [
+            f"🔑 Using API: {selected_api['name']}\n",
+            f"🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        ]
+
+        total_value = 0
+        for account_name, data in earn_balances.items():
+            if not data['holdings']:
+                message_parts.append("\nNo active earn positions found.")
+                continue
+
+            for holding in data['holdings']:
+                total_value += holding['value_usdt']
+                message_parts.append(
+                    f"\n{holding['currency']}:"
+                    f"\n  Amount: {format(holding['amount'], '.8f')}"
+                    f"\n  APR: {format(holding['min_rate'] * 100, '.2f')}%"
+                    f"\n  Value: {format(holding['value_usdt'], ',.2f')} USDT"  # Added comma formatting
+                )
+
+        if total_value > 0:
+            message_parts.append(f"\n\nTotal Earn Value: {format(total_value, ',.2f')} USDT")  # Added comma formatting
+
+        keyboard = [[
+            InlineKeyboardButton("🔄 Refresh", callback_data="refresh_earn")
+        ]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        full_message = '\n'.join(message_parts)
+        if len(full_message) > 4000:
+            if is_callback:
+                await update.callback_query.edit_message_text(
+                    "Message too long for callback query. Please use the menu command again."
+                )
+            else:
+                chunks = textwrap.wrap(full_message, 4000)
+                for i, chunk in enumerate(chunks):
+                    if i == len(chunks) - 1:
+                        await update.message.reply_text(chunk, reply_markup=reply_markup)
+                    else:
+                        await update.message.reply_text(chunk)
+        else:
+            if is_callback:
+                await update.callback_query.edit_message_text(
+                    text=full_message,
+                    reply_markup=reply_markup
+                )
+            else:
+                await update.message.reply_text(
+                    text=full_message,
+                    reply_markup=reply_markup
+                )
+
+        if processing_msg:
+            await processing_msg.delete()
+
+    except Exception as e:
+        logger.error(f"Error getting earn positions: {str(e)}")
+        error_message = f"Error getting earn positions: {str(e)}"
+        if is_callback:
+            await update.callback_query.edit_message_text(error_message)
+        else:
+            await update.message.reply_text(error_message)
+
+async def refresh_earn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    await sendEarn(update, context)

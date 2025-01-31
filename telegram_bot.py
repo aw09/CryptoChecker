@@ -4,26 +4,23 @@ from datetime import datetime
 import streamlit as st
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters, CallbackQueryHandler
-import textwrap
 from functools import wraps
 from gate_script import check_ticker_exists
 import logging
-import asyncio
-from db_utils import (register_user, add_api_key, get_user_api_keys, 
-                     set_alert, get_user_alerts, delete_api_key, set_selected_api, get_selected_api)
+
 from handlers.alert_handlers import (
     add_alert_start, alert_coin_received, alert_condition_received,
-    alert_price_received, show_alerts, cancel_alert,
+    alert_price_received, cancel_alert,
     ALERT_COIN, ALERT_CONDITION, ALERT_PRICE
 )
 from handlers.api_handlers import (
     add_api_start, add_api_key_received, add_api_secret_received,
-    add_api_name_received, show_my_apis, handle_api_deletion,
+    add_api_name_received, handle_api_deletion,
     handle_api_selection, show_api_detail, back_to_apis,
     APIKEY, APISECRET, APINAME
 )
 from handlers.balance_handlers import (
-    sendInfo, sendHoldings, refresh_balance, refresh_holdings
+    refresh_balance, refresh_holdings, refresh_earn
 )
 from menu_handlers import show_main_menu, start, handle_message
 
@@ -137,4 +134,5 @@ def setup_handlers(app):
     app.add_handler(CallbackQueryHandler(refresh_balance, pattern="^refresh_balance$"))  # Add this line
     app.add_handler(CallbackQueryHandler(refresh_holdings, pattern="^refresh_holdings$"))
     app.add_handler(CallbackQueryHandler(back_to_apis, pattern="^back_to_apis$"))
+    app.add_handler(CallbackQueryHandler(refresh_earn, pattern="^refresh_earn$"))
 
