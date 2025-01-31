@@ -262,11 +262,12 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             context.user_data['trade_type'] = 'buy'
             context.user_data['awaiting_custom_coin'] = False
             
-            selected_api = await get_selected_api(update.effective_user.id)
+            selected_api = get_selected_api()  # Remove await since get_selected_api is not async
             if not selected_api:
                 await update.message.reply_text("Please select an API first using 🔐 My APIs")
                 return ConversationHandler.END
             
+            # Check if the trading pair exists
             if not check_ticker_exists(selected_api['api_key'], selected_api['api_secret'], coin):
                 await update.message.reply_text(f"Trading pair {coin}_USDT does not exist.")
                 return ConversationHandler.END
@@ -276,7 +277,7 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 "Please enter the amount in USDT or /cancel to abort."
             )
             return TRADE_AMOUNT
-            
+
         # Handle amount input
         amount = float(text)
         if amount <= 0:

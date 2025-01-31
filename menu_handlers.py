@@ -19,7 +19,11 @@ from handlers.api_handlers import (
     add_api_start,
     show_my_apis,
 )
-from handlers.trade_handlers import start_buy_flow, handle_sell_all
+from handlers.trade_handlers import (
+    start_buy_flow, 
+    handle_sell_all,
+    execute_trade,
+)
 from handlers.balance_handlers import sendInfo, sendHoldings, sendEarn
 
 
@@ -50,6 +54,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text messages and menu buttons"""
     text = update.message.text
+    
+    # Check if we're waiting for a coin input for buy
+    if context.user_data.get('awaiting_custom_coin'):
+        # Pass to execute_trade to handle the coin input
+        await execute_trade(update, context)
+        return
 
     if text == "💵 Buy":
         await start_buy_flow(update, context)
