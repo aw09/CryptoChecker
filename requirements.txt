@@ -41,6 +41,7 @@ pydeck==0.9.1
 Pygments==2.19.1
 pymongo==4.10.1
 pytest==8.3.4
+pytest-asyncio==0.24.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-telegram-bot==21.6

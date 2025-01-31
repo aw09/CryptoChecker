@@ -19,7 +19,8 @@ from handlers.alert_handlers import (
 from handlers.api_handlers import (
     add_api_start, add_api_key_received, add_api_secret_received,
     add_api_name_received, show_my_apis, handle_api_deletion,
-    handle_api_selection, APIKEY, APISECRET, APINAME
+    handle_api_selection, show_api_detail, back_to_apis,
+    APIKEY, APISECRET, APINAME
 )
 from handlers.balance_handlers import sendInfo, sendHoldings
 from menu_handlers import show_main_menu, start, handle_message
@@ -128,5 +129,7 @@ def setup_handlers(app):
     app.add_handler(alert_conv_handler)
     app.add_handler(api_conv_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(CallbackQueryHandler(show_api_detail, pattern="^api_detail_"))
     app.add_handler(CallbackQueryHandler(handle_api_deletion, pattern="^delete_api_"))
     app.add_handler(CallbackQueryHandler(handle_api_selection, pattern="^select_api_"))
+    app.add_handler(CallbackQueryHandler(back_to_apis, pattern="^back_to_apis$"))

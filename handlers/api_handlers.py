@@ -48,28 +48,31 @@ async def show_my_apis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text("You haven't added any API keys yet.\nUse /addapi to add one.")
             return
         
+        selected_api = await get_selected_api(update.effective_user.id)
         keyboard = []
+        
         for api in apis:
             keyboard.append([
                 InlineKeyboardButton(
-                    f"🗑️ Delete {api['name']}", 
-                    callback_data=f"delete_api_{api['name']}"
+                    f"📋 Details for {api['name']}", 
+                    callback_data=f"api_detail_{api['name']}"
                 )
             ])
-            keyboard.append([
-                InlineKeyboardButton(
-                    f"📌 Select {api['name']}", 
-                    callback_data=f"select_api_{api['name']}"
-                )
-            ])
+            # Only show select button if the API is not currently selected
+            if not selected_api or selected_api['name'] != api['name']:
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"📌 Select {api['name']}", 
+                        callback_data=f"select_api_{api['name']}"
+                    )
+                ])
         
         message = "Your API Keys:\n\n"
         for i, api in enumerate(apis, 1):
             message += f"{i}. {api['name']}\n"
             message += f"   Added: {api['added_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
         
-        selected_api = await get_selected_api(update.effective_user.id)
-        if (selected_api):
+        if selected_api:
             message += f"\nCurrently using: {selected_api['name']}"
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -77,6 +80,38 @@ async def show_my_apis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     except Exception as e:
         logger.error(f"Error showing APIs: {e}")
         await update.message.reply_text("Error fetching your API keys.")
+
+async def show_api_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show API details and delete option"""
+    query = update.callback_query
+    await query.answer()
+    
+    api_name = query.data.replace("api_detail_", "")
+    apis = await get_user_api_keys(query.from_user.id)
+    api = next((a for a in apis if a['name'] == api_name), None)
+    
+    if not api:
+        await query.edit_message_text("API not found.")
+        return
+    
+    message = f"API Details for {api['name']}\n"
+    message += f"Added: {api['added_at'].strftime('%Y-%m-%d %H:%M')}\n"
+    message += "\n⚠️ Deleting an API is irreversible!"
+    
+    keyboard = [[
+        InlineKeyboardButton("🗑️ Delete API", callback_data=f"delete_api_{api_name}")
+    ], [
+        InlineKeyboardButton("« Back to API List", callback_data="back_to_apis")
+    ]]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(message, reply_markup=reply_markup)
+
+async def back_to_apis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle back button to API list"""
+    query = update.callback_query
+    await query.answer()
+    await show_my_apis(update, context)
 
 async def handle_api_deletion(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
