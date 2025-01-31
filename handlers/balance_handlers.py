@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from gate_script import get_balance, get_spot_holdings, get_earn_balances
+from gate_script import get_balance, get_spot_holdings, get_earn_balances, redeem_from_earn, get_lending_rates, lend_to_earn
 from db_utils import get_selected_api
 import textwrap
 
@@ -12,6 +12,17 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+def format_number(value):
+    """Format number with appropriate decimal places based on magnitude"""
+    if isinstance(value, str):
+        value = float(value)
+    if value >= 1000:
+        return f"{value:,.2f}"  # Use comma as thousand separator and 2 decimal places
+    elif value >= 1:
+        return f"{value:.4f}"   # 4 decimal places for values between 1 and 1000
+    else:
+        return f"{value:.8f}"   # 8 decimal places for values less than 1
 
 async def sendInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     print(f"Received command from {update.effective_user.username}")
@@ -218,6 +229,13 @@ async def sendEarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     f"\n  APR: {format(holding['min_rate'] * 100, '.2f')}%"
                     f"\n  Value: {format(holding['value_usdt'], ',.2f')} USDT"  # Added comma formatting
                 )
+                # Add redeem button for each currency
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"Redeem {holding['currency']}", 
+                        callback_data=f"redeem_{holding['currency']}"
+                    )
+                ])
 
         if total_value > 0:
             message_parts.append(f"\n\nTotal Earn Value: {format(total_value, ',.2f')} USDT")  # Added comma formatting
@@ -266,4 +284,169 @@ async def sendEarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def refresh_earn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-    await sendEarn(update, context)
+    
+    try:
+        api_data = get_selected_api()
+        if not api_data:
+            await query.edit_message_text("No API selected. Please select an API first.")
+            return
+
+        earn_data = get_earn_balances(api_data['api_key'], api_data['api_secret'])
+        
+        message = "*Earn Products:*\n\n"
+        keyboard = []
+        
+        if earn_data and earn_data['account1']['holdings']:
+            for holding in earn_data['account1']['holdings']:
+                currency = holding['currency']
+                amount = format_number(holding['amount'])
+                value_usdt = format_number(holding['value_usdt'])
+                min_rate = format_number(holding['min_rate'] * 100)
+                
+                message += f"*{currency}*\n"
+                message += f"Amount: {amount}\n"
+                message += f"Value: ${value_usdt}\n"
+                message += f"APR: {min_rate}%\n\n"
+                
+                # Add redeem and lend buttons for each currency
+                keyboard.append([
+                    InlineKeyboardButton(f"Redeem {currency}", callback_data=f"redeem_{currency}"),
+                    InlineKeyboardButton(f"Lend {currency}", callback_data=f"lend_{currency}")
+                ])
+        else:
+            message += "No assets in earn products.\n"
+        
+        # Add refresh button at the bottom
+        keyboard.append([
+            InlineKeyboardButton("🔄 Refresh", callback_data="refresh_earn")
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            text=message,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        await query.edit_message_text(f"Error refreshing earn data: {str(e)}")
+
+async def handle_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle redeem from earn callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        # Extract currency from callback data (format: "redeem_BTC")
+        currency = query.data.split('_')[1]
+        api_data = get_selected_api()
+        
+        if not api_data:
+            await query.edit_message_text("No API selected. Please select an API first.")
+            return
+            
+        # Redeem all available amount for the currency
+        result = redeem_from_earn(
+            api_data['api_key'], 
+            api_data['api_secret'],
+            currency,
+            redeem_all=True
+        )
+        
+        if result['status'] == 'success':
+            await query.edit_message_text(
+                f"Successfully redeemed {currency} from earn.\nPlease wait a few minutes for the transaction to process.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 Refresh Earn", callback_data="refresh_earn")]
+                ])
+            )
+        else:
+            await query.edit_message_text(
+                f"Failed to redeem {currency} from earn: {result.get('error', 'Unknown error')}",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 Refresh Earn", callback_data="refresh_earn")]
+                ])
+            )
+            
+    except Exception as e:
+        await query.edit_message_text(
+            f"Error processing redeem: {str(e)}",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Refresh Earn", callback_data="refresh_earn")]
+            ])
+        )
+
+async def handle_lend(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle lending to earn"""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        # Extract currency from callback data (format: "lend_BTC")
+        currency = query.data.split('_')[1]
+        api_data = get_selected_api()
+        
+        if not api_data:
+            await query.edit_message_text("No API selected. Please select an API first.")
+            return
+        
+        # Get available balance for the currency
+        holdings = get_spot_holdings(api_data['api_key'], api_data['api_secret'])
+        available_amount = 0
+        
+        for holding in holdings['account1']['holdings']:
+            if holding['currency'] == currency:
+                available_amount = holding['available']
+                break
+        
+        if available_amount <= 0:
+            await query.edit_message_text(
+                f"No available {currency} balance to lend.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 Refresh Earn", callback_data="refresh_earn")]
+                ])
+            )
+            return
+            
+        # Get lending rates
+        rates = get_lending_rates(api_data['api_key'], api_data['api_secret'])
+        if currency not in rates:
+            await query.edit_message_text(
+                f"{currency} is not available for lending.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 Refresh Earn", callback_data="refresh_earn")]
+                ])
+            )
+            return
+        
+        # Lend all available amount at minimum rate
+        result = lend_to_earn(
+            api_data['api_key'],
+            api_data['api_secret'],
+            currency,
+            available_amount,
+            rates[currency]['min_rate']
+        )
+        
+        if result['status'] == 'success':
+            await query.edit_message_text(
+                f"Successfully lent {format_number(available_amount)} {currency} to earn at {format_number(result['min_rate']*100)}% APR",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 Refresh Earn", callback_data="refresh_earn")]
+                ])
+            )
+        else:
+            await query.edit_message_text(
+                f"Failed to lend {currency}: {result.get('error', 'Unknown error')}",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 Refresh Earn", callback_data="refresh_earn")]
+                ])
+            )
+            
+    except Exception as e:
+        await query.edit_message_text(
+            f"Error processing lend: {str(e)}",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Refresh Earn", callback_data="refresh_earn")]
+            ])
+        )

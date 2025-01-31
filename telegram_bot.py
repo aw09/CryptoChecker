@@ -21,7 +21,8 @@ from handlers.api_handlers import (
     APIKEY, APISECRET, APINAME
 )
 from handlers.balance_handlers import (
-    refresh_balance, refresh_holdings, refresh_earn
+    refresh_balance, refresh_holdings, refresh_earn,
+    handle_redeem, handle_lend
 )
 from menu_handlers import show_main_menu, start, handle_message
 from handlers.trade_handlers import (
@@ -169,4 +170,6 @@ def setup_handlers(app):
     app.add_handler(CallbackQueryHandler(refresh_holdings, pattern="^refresh_holdings$"))
     app.add_handler(CallbackQueryHandler(back_to_apis, pattern="^back_to_apis$"))
     app.add_handler(CallbackQueryHandler(refresh_earn, pattern="^refresh_earn$"))
+    app.add_handler(CallbackQueryHandler(handle_redeem, pattern="^redeem_[A-Z0-9]+$"))
+    app.add_handler(CallbackQueryHandler(handle_lend, pattern="^lend_[A-Z0-9]+$"))
 
