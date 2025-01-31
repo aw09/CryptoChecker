@@ -2,7 +2,7 @@ import pymongo
 import streamlit as st
 from datetime import datetime
 from typing import Dict, List, Optional
-from crypto_utils import encrypt_text, decrypt_text
+from utils.crypto_utils import encrypt_text, decrypt_text
 
 client = pymongo.MongoClient(st.secrets["mongodb"]["url"])
 db = client.crypto_checker
