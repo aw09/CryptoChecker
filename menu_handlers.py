@@ -24,10 +24,10 @@ from handlers.balance_handlers import sendInfo, sendHoldings, sendEarn
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
-        [KeyboardButton("💰 Balance"), KeyboardButton("📊 Holdings")],
-        [KeyboardButton("💎 Earn"), KeyboardButton("🎯 Add Alert")],
-        [KeyboardButton("🔔 My Alerts"), KeyboardButton("🔑 Add API")],
-        [KeyboardButton("🔐 My APIs")],
+        [KeyboardButton("💰 Balance")],
+        [KeyboardButton("📊 Holdings"), KeyboardButton("💎 Earn")],
+        [KeyboardButton("🎯 Add Alert"), KeyboardButton("🔔 My Alerts")],
+        [KeyboardButton("🔑 Add API"), KeyboardButton("🔐 My APIs")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
