@@ -45,7 +45,11 @@ async def show_my_apis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         apis = await get_user_api_keys(update.effective_user.id)
         if not apis:
-            await update.message.reply_text("You haven't added any API keys yet.\nUse /addapi to add one.")
+            message = "You haven't added any API keys yet.\nUse /addapi to add one."
+            if update.callback_query:
+                await update.callback_query.edit_message_text(message)
+            else:
+                await update.message.reply_text(message)
             return
         
         selected_api = await get_selected_api(update.effective_user.id)
@@ -59,7 +63,7 @@ async def show_my_apis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 )
             ])
             # Only show select button if the API is not currently selected
-            if not selected_api or selected_api['name'] != api['name']:
+            if not selected_api or selected_api.get('name') != api['name']:
                 keyboard.append([
                     InlineKeyboardButton(
                         f"📌 Select {api['name']}", 
@@ -72,14 +76,30 @@ async def show_my_apis(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             message += f"{i}. {api['name']}\n"
             message += f"   Added: {api['added_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
         
-        if selected_api:
+        # Safely add selected API info if it exists
+        if selected_api and selected_api.get('name'):
             message += f"\nCurrently using: {selected_api['name']}"
         
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(message, reply_markup=reply_markup)
+        
+        if update.callback_query:
+            await update.callback_query.edit_message_text(
+                text=message,
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                text=message,
+                reply_markup=reply_markup
+            )
+            
     except Exception as e:
         logger.error(f"Error showing APIs: {e}")
-        await update.message.reply_text("Error fetching your API keys.")
+        error_message = "Error fetching your API keys."
+        if update.callback_query:
+            await update.callback_query.edit_message_text(error_message)
+        else:
+            await update.message.reply_text(error_message)
 
 async def show_api_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show API details and delete option"""

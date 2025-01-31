@@ -72,43 +72,6 @@ async def test_add_api_name_received_success():
         assert result == ConversationHandler.END
 
 @pytest.mark.asyncio
-async def test_show_my_apis_with_apis(update, context):
-    mock_apis = [
-        {
-            'name': 'Test API 1',
-            'added_at': datetime.now(),
-        },
-        {
-            'name': 'Test API 2',
-            'added_at': datetime.now(),
-        }
-    ]
-    
-    with patch('handlers.api_handlers.get_user_api_keys', new_callable=AsyncMock) as mock_get_apis, \
-         patch('handlers.api_handlers.get_selected_api', new_callable=AsyncMock) as mock_get_selected:
-        mock_get_apis.return_value = mock_apis
-        mock_get_selected.return_value = {'name': 'Test API 1'}
-        
-        await show_my_apis(update, context)
-        
-        update.message.reply_text.assert_called_once()
-        call_args = update.message.reply_text.call_args
-        assert "Test API 1" in call_args[0][0]
-        assert "Test API 2" in call_args[0][0]
-        assert "Currently using: Test API 1" in call_args[0][0]
-
-@pytest.mark.asyncio
-async def test_show_my_apis_no_apis(update, context):
-    with patch('handlers.api_handlers.get_user_api_keys', new_callable=AsyncMock) as mock_get_apis:
-        mock_get_apis.return_value = []
-        
-        await show_my_apis(update, context)
-        
-        update.message.reply_text.assert_called_once_with(
-            "You haven't added any API keys yet.\nUse /addapi to add one."
-        )
-
-@pytest.mark.asyncio
 async def test_handle_api_deletion_success(update, context):
     update.callback_query.data = "delete_api_Test API"
     
@@ -134,4 +97,89 @@ async def test_handle_api_selection_success(update, context):
         update.callback_query.answer.assert_called_once()
         update.callback_query.edit_message_text.assert_called_once_with(
             "Successfully selected API: Test API"
+        )
+
+@pytest.mark.asyncio
+async def test_show_my_apis_direct_message(update, context):
+    """Test showing APIs through direct message"""
+    mock_apis = [
+        {
+            'name': 'Test API 1',
+            'added_at': datetime.now(),
+        },
+        {
+            'name': 'Test API 2',
+            'added_at': datetime.now(),
+        }
+    ]
+    
+    # Set callback_query to None for direct message testing
+    update.callback_query = None
+    
+    with patch('handlers.api_handlers.get_user_api_keys', new_callable=AsyncMock) as mock_get_apis, \
+         patch('handlers.api_handlers.get_selected_api', new_callable=AsyncMock) as mock_get_selected:
+        mock_get_apis.return_value = mock_apis
+        mock_get_selected.return_value = {'name': 'Test API 1'}
+        
+        await show_my_apis(update, context)
+        
+        update.message.reply_text.assert_called_once()
+        call_args = update.message.reply_text.call_args
+        assert isinstance(call_args[1]['reply_markup'], InlineKeyboardMarkup)
+        assert "Test API 1" in call_args[1]['text']
+        assert "Test API 2" in call_args[1]['text']
+        assert "Currently using: Test API 1" in call_args[1]['text']
+
+@pytest.mark.asyncio
+async def test_show_my_apis_callback_query(update, context):
+    """Test showing APIs through callback query"""
+    mock_apis = [
+        {
+            'name': 'Test API 1',
+            'added_at': datetime.now(),
+        },
+        {
+            'name': 'Test API 2',
+            'added_at': datetime.now(),
+        }
+    ]
+    
+    with patch('handlers.api_handlers.get_user_api_keys', new_callable=AsyncMock) as mock_get_apis, \
+         patch('handlers.api_handlers.get_selected_api', new_callable=AsyncMock) as mock_get_selected:
+        mock_get_apis.return_value = mock_apis
+        mock_get_selected.return_value = {'name': 'Test API 1'}
+        
+        await show_my_apis(update, context)
+        
+        update.callback_query.edit_message_text.assert_called_once()
+        call_args = update.callback_query.edit_message_text.call_args
+        assert isinstance(call_args[1]['reply_markup'], InlineKeyboardMarkup)
+        assert "Test API 1" in call_args[1]['text']
+        assert "Test API 2" in call_args[1]['text']
+        assert "Currently using: Test API 1" in call_args[1]['text']
+
+@pytest.mark.asyncio
+async def test_show_my_apis_no_apis_direct_message(update, context):
+    """Test showing no APIs through direct message"""
+    update.callback_query = None
+    
+    with patch('handlers.api_handlers.get_user_api_keys', new_callable=AsyncMock) as mock_get_apis:
+        mock_get_apis.return_value = []
+        
+        await show_my_apis(update, context)
+        
+        update.message.reply_text.assert_called_once_with(
+            "You haven't added any API keys yet.\nUse /addapi to add one."
+        )
+
+@pytest.mark.asyncio
+async def test_show_my_apis_no_apis_callback_query(update, context):
+    """Test showing no APIs through callback query"""
+    with patch('handlers.api_handlers.get_user_api_keys', new_callable=AsyncMock) as mock_get_apis:
+        mock_get_apis.return_value = []
+        
+        await show_my_apis(update, context)
+        
+        update.callback_query.edit_message_text.assert_called_once_with(
+            "You haven't added any API keys yet.\nUse /addapi to add one."
         )
