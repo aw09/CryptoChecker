@@ -216,6 +216,8 @@ async def sendEarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ]
 
         total_value = 0
+        keyboard = []  # Initialize keyboard list here
+        
         for account_name, data in earn_balances.items():
             if not data['holdings']:
                 message_parts.append("\nNo active earn positions found.")
@@ -229,20 +231,19 @@ async def sendEarn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     f"\n  APR: {format(holding['min_rate'] * 100, '.2f')}%"
                     f"\n  Value: {format(holding['value_usdt'], ',.2f')} USDT"  # Added comma formatting
                 )
-                # Add redeem button for each currency
+                # Add redeem and lend buttons for each currency
                 keyboard.append([
-                    InlineKeyboardButton(
-                        f"Redeem {holding['currency']}", 
-                        callback_data=f"redeem_{holding['currency']}"
-                    )
+                    InlineKeyboardButton(f"Redeem {holding['currency']}", callback_data=f"redeem_{holding['currency']}"),
+                    InlineKeyboardButton(f"Lend {holding['currency']}", callback_data=f"lend_{holding['currency']}")
                 ])
 
         if total_value > 0:
             message_parts.append(f"\n\nTotal Earn Value: {format(total_value, ',.2f')} USDT")  # Added comma formatting
 
-        keyboard = [[
+        # Add refresh button at the bottom
+        keyboard.append([
             InlineKeyboardButton("🔄 Refresh", callback_data="refresh_earn")
-        ]]
+        ])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         full_message = '\n'.join(message_parts)
