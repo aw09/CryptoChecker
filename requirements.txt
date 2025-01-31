@@ -26,6 +26,7 @@ jsonschema-specifications==2023.12.1
 markdown-it-py==3.0.0
 MarkupSafe==2.1.5
 mdurl==0.1.2
+motor==3.6.1
 narwhals==1.24.0
 nest-asyncio==1.5.8
 numpy==1.24.4
@@ -39,9 +40,10 @@ pyarrow==17.0.0
 pycparser==2.22
 pydeck==0.9.1
 Pygments==2.19.1
-pymongo==4.10.1
+pymongo==4.9.2
 pytest==8.3.4
 pytest-asyncio==0.24.0
+pytest-mock==3.14.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-telegram-bot==21.6
