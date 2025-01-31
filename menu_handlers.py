@@ -19,13 +19,14 @@ from handlers.api_handlers import (
     add_api_start,
     show_my_apis,
 )
+from handlers.trade_handlers import start_buy_flow
 from handlers.balance_handlers import sendInfo, sendHoldings, sendEarn
 
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
-        [KeyboardButton("💰 Balance")],
-        [KeyboardButton("📊 Holdings"), KeyboardButton("💎 Earn")],
+        [KeyboardButton("💰 Balance"), KeyboardButton("📊 Holdings")],
+        [KeyboardButton("💎 Earn"), KeyboardButton("💵 Buy")],
         [KeyboardButton("🎯 Add Alert"), KeyboardButton("🔔 My Alerts")],
         [KeyboardButton("🔑 Add API"), KeyboardButton("🔐 My APIs")],
     ]
@@ -49,7 +50,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Handle text messages and menu buttons"""
     text = update.message.text
 
-    if text == "💰 Balance":
+    if text == "💵 Buy":
+        await start_buy_flow(update, context)
+    elif text == "💰 Balance":
         await sendInfo(update, context)
     elif text == "📊 Holdings":
         await sendHoldings(update, context)

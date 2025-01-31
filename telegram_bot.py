@@ -26,6 +26,7 @@ from menu_handlers import show_main_menu, start, handle_message
 from handlers.trade_handlers import (
     start_buy, start_sell, execute_trade, cancel_trade,
     handle_sell_amount_option, handle_sell_percentage, 
+    start_buy_flow,
     TRADE_AMOUNT, TRADE_PERCENTAGE
 )
 
@@ -128,11 +129,12 @@ def setup_handlers(app):
         name='alert_conversation'
     )
 
-    # Add conversation handler for trading
+    # Update trade handler to remove unneeded handlers
     trade_handler = ConversationHandler(
         entry_points=[
-            CallbackQueryHandler(start_buy, pattern=r'^buy_\w+$'),
-            CallbackQueryHandler(start_sell, pattern=r'^sell_\w+$')
+            CallbackQueryHandler(start_buy, pattern=r'^buy_[A-Z0-9]+$'),
+            CallbackQueryHandler(start_sell, pattern=r'^sell_[A-Z0-9]+$'),
+            MessageHandler(filters.Regex('^💵 Buy$'), start_buy_flow)
         ],
         states={
             TRADE_PERCENTAGE: [

@@ -116,10 +116,12 @@ async def sendHoldings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     f"\n  Price: {format(holding['price_usdt'], '.4f')} USDT"
                     f"\n  Value: {format(holding['value_usdt'], '.2f')} USDT"
                 )
-                keyboard.append([
-                    InlineKeyboardButton(f"Buy {holding['currency']}", callback_data=f"buy_{holding['currency']}"),
-                    InlineKeyboardButton(f"Sell {holding['currency']}", callback_data=f"sell_{holding['currency']}")
-                ])
+                # Only add buy/sell buttons for non-USDT holdings
+                if holding['currency'] != 'USDT':
+                    keyboard.append([
+                        InlineKeyboardButton(f"Buy {holding['currency']}", callback_data=f"buy_{holding['currency']}"),
+                        InlineKeyboardButton(f"Sell {holding['currency']}", callback_data=f"sell_{holding['currency']}")
+                    ])
             
             account_total_usdt[account_name] = account_total
             message_parts.append(f"\nSubtotal: {format(account_total, '.2f')} USDT")

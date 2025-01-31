@@ -1,7 +1,7 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from gate_script import buy_spot, sell_spot, get_spot_holdings
+from gate_script import buy_spot, sell_spot, get_spot_holdings, check_ticker_exists
 from db_utils import get_selected_api
 
 # Add new state for percentage selection
@@ -154,9 +154,46 @@ async def handle_sell_amount_option(update: Update, context: ContextTypes.DEFAUL
         await query.edit_message_text(f"Error setting up sell amount: {str(e)}")
         return ConversationHandler.END
 
+async def start_buy_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Start the buying process by asking for the coin"""
+    context.user_data['awaiting_custom_coin'] = True
+    await update.message.reply_text(
+        "Please enter the coin symbol you want to buy (e.g., BTC, ETH):"
+    )
+    return TRADE_AMOUNT
+
 async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        amount = float(update.message.text)
+        text = update.message.text
+        
+        # Handle custom coin input
+        if context.user_data.get('awaiting_custom_coin'):
+            coin = text.strip().upper()
+            context.user_data['trade_coin'] = coin
+            context.user_data['trade_type'] = 'buy'
+            context.user_data['awaiting_custom_coin'] = False
+            
+            selected_api = await get_selected_api(update.effective_user.id)
+            if not selected_api:
+                await update.message.reply_text("Please select an API first using 🔐 My APIs")
+                return ConversationHandler.END
+            
+            if not check_ticker_exists(selected_api['api_key'], selected_api['api_secret'], coin):
+                await update.message.reply_text(f"Trading pair {coin}_USDT does not exist.")
+                return ConversationHandler.END
+            
+            await update.message.reply_text(
+                f"How many {coin} would you like to buy?\n"
+                "Please enter the amount in USDT or /cancel to abort."
+            )
+            return TRADE_AMOUNT
+            
+        # Handle amount input
+        amount = float(text)
+        if amount <= 0:
+            raise ValueError("Amount must be greater than 0")
+            
+        # Rest of the existing execute_trade code
         coin = context.user_data['trade_coin']
         trade_type = context.user_data['trade_type']
         
@@ -187,14 +224,13 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             f"Order ID: {result['order_id']}\n"
             f"Status: {result['status']}"
         )
-
-    except ValueError:
-        await update.message.reply_text("Please enter a valid number.")
+        
+    except ValueError as e:
+        await update.message.reply_text(f"Invalid input: {str(e)}")
         return TRADE_AMOUNT
     except Exception as e:
-        await update.message.reply_text(f"Error executing trade: {str(e)}")
-    
-    return ConversationHandler.END
+        await update.message.reply_text(f"Error: {str(e)}")
+        return ConversationHandler.END
 
 async def cancel_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Trade cancelled.")
