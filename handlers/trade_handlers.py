@@ -1,8 +1,9 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from gate_script import buy_spot, sell_spot, get_spot_holdings, check_ticker_exists
+from gate_script import buy_spot, sell_spot, get_spot_holdings, check_ticker_exists, get_earn_balances, redeem_from_earn
 from db_utils import get_selected_api
+import asyncio
 
 # Add new state for percentage selection
 TRADE_AMOUNT, TRADE_PERCENTAGE = range(2)
@@ -373,5 +374,103 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def cancel_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Trade cancelled.")
     return ConversationHandler.END
-    return ConversationHandler.END
+
+async def handle_sell_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle selling all assets"""
+    try:
+        # Show confirmation button first
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ Confirm SELL ALL", callback_data="confirm_sell_all"),
+                InlineKeyboardButton("❌ Cancel", callback_data="cancel_sell_all")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            "⚠️ WARNING: This will sell ALL your assets to USDT!\n\n"
+            "1. Redeem all from earn products\n"
+            "2. Sell all holdings at market price\n\n"
+            "Are you sure?",
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        await update.message.reply_text(f"Error: {str(e)}")
+
+async def execute_sell_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Execute the sell all operation"""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        api_data = get_selected_api()
+        if not api_data:
+            await query.edit_message_text("No API selected. Please select an API first.")
+            return
+
+        status_message = await query.edit_message_text("Starting sell all process...")
+        results = []
+
+        # Step 1: Redeem all from earn
+        try:
+            earn_data = get_earn_balances(api_data['api_key'], api_data['api_secret'])
+            if earn_data and earn_data['account1']['holdings']:
+                for holding in earn_data['account1']['holdings']:
+                    currency = holding['currency']
+                    try:
+                        result = redeem_from_earn(
+                            api_data['api_key'],
+                            api_data['api_secret'],
+                            currency,
+                            redeem_all=True
+                        )
+                        results.append(f"✅ Redeemed {currency} from earn")
+                    except Exception as e:
+                        results.append(f"❌ Failed to redeem {currency}: {str(e)}")
+                
+                # Wait message for earn redemption
+                results.append("⏳ Waiting for earn redemptions to process (2 minutes)...")
+                await status_message.edit_text("\n".join(results))
+                await asyncio.sleep(120)  # Wait 2 minutes for redemptions to process
+        except Exception as e:
+            results.append(f"❌ Error checking earn positions: {str(e)}")
+
+        # Step 2: Sell all holdings
+        try:
+            holdings = get_spot_holdings(api_data['api_key'], api_data['api_secret'])
+            if holdings and holdings['account1']['holdings']:
+                for holding in holdings['account1']['holdings']:
+                    currency = holding['currency']
+                    available = holding['available']
+                    
+                    if currency != 'USDT' and available > 0:
+                        try:
+                            result = sell_spot(
+                                api_data['api_key'],
+                                api_data['api_secret'],
+                                currency,
+                                available
+                            )
+                            results.append(f"✅ Sold {available} {currency}")
+                        except Exception as e:
+                            results.append(f"❌ Failed to sell {currency}: {str(e)}")
+        except Exception as e:
+            results.append(f"❌ Error selling holdings: {str(e)}")
+
+        # Final status update
+        results.append("\n🏁 Sell all process completed!")
+        await status_message.edit_text(
+            "\n".join(results),
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📊 Check Holdings", callback_data="refresh_holdings")]
+            ])
+        )
+
+    except Exception as e:
+        await query.edit_message_text(f"Error executing sell all: {str(e)}")
+
+async def cancel_sell_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel sell all operation"""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("❌ Sell all operation cancelled.")
 

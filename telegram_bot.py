@@ -29,6 +29,7 @@ from handlers.trade_handlers import (
     start_buy, start_sell, execute_trade, cancel_trade,
     handle_sell_amount_option, handle_sell_percentage, 
     start_buy_flow, handle_sell_usdt_option,
+    execute_sell_all, cancel_sell_all,
     TRADE_AMOUNT, TRADE_PERCENTAGE
 )
 
@@ -172,4 +173,8 @@ def setup_handlers(app):
     app.add_handler(CallbackQueryHandler(refresh_earn, pattern="^refresh_earn$"))
     app.add_handler(CallbackQueryHandler(handle_redeem, pattern="^redeem_[A-Z0-9]+$"))
     app.add_handler(CallbackQueryHandler(handle_lend, pattern="^lend_[A-Z0-9]+$"))
+    
+    # Add sell all handlers
+    app.add_handler(CallbackQueryHandler(execute_sell_all, pattern="^confirm_sell_all$"))
+    app.add_handler(CallbackQueryHandler(cancel_sell_all, pattern="^cancel_sell_all$"))
 
