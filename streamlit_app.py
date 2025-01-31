@@ -22,15 +22,16 @@ nest_asyncio.apply()
 
 async def run_bot_and_workers():
     """Run both the bot and alert checker worker"""
-    app = get_application()
-    
     try:
+        app = get_application()
+        
         # Run both the bot and alert checker concurrently
         await asyncio.gather(
             run_bot(),
             check_alerts(app.bot)
         )
     except Exception as e:
+        logger.debug("Exception caught in run_bot_and_workers", exc_info=True)
         logger.error(f"Error in bot or worker: {e}", exc_info=True)
         raise
 
@@ -54,9 +55,14 @@ def main():
     st.set_page_config(page_title="Crypto Checker Bot")
     st.title("Crypto Checker Bot")
     
-    public_ip = get_public_ip()
-    logger.info(f"Running on Public IP: {public_ip}")
-    print(f"Running on Public IP: {public_ip}")
+    try:
+        public_ip = get_public_ip()
+        logger.info(f"Running on Public IP: {public_ip}")
+        print(f"Running on Public IP: {public_ip}")
+    except Exception as e:
+        logger.error(f"Failed to get public IP: {e}")
+        print(f"Failed to get public IP: {e}")
+        public_ip = "Unable to get public IP"
     
     # Start bot in background thread if not already running
     if 'bot_thread' not in st.session_state:
