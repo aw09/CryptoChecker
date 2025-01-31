@@ -148,7 +148,8 @@ def setup_handlers(app):
             ]
         },
         fallbacks=[CommandHandler('cancel', cancel_trade)],
-        name='trade_conversation'
+        name='trade_conversation',
+        per_message=True  # Add this line
     )
     
     # Important: Remove any existing handlers before adding new ones

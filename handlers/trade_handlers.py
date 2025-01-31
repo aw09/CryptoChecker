@@ -15,20 +15,30 @@ logger = logging.getLogger(__name__)
 
 def extract_coin_from_callback(callback_data: str) -> str:
     """Extract coin name from callback data, handling USDT pairs"""
-    parts = callback_data.split('_')
-    if len(parts) < 2:
-        raise ValueError("Invalid callback data format")
-    
-    # Handle cases like "buy_USDT" or "sell_USDT"
-    if len(parts) == 2 and parts[1] == "USDT":
-        return "USDT"
-    
-    # Handle cases like "buy_BTC_USDT" or "sell_ETH_USDT"
-    if len(parts) == 3 and parts[2] == "USDT":
+    try:
+        parts = callback_data.split('_')
+        logger.info(f"Callback data parts: {parts}")  # Debug logging
+        
+        # Handle sellusdt pattern
+        if parts[0] == 'sellusdt':
+            return parts[1]
+            
+        if len(parts) < 2:
+            raise ValueError("Invalid callback data format")
+        
+        # Handle cases like "buy_USDT" or "sell_USDT"
+        if len(parts) == 2 and parts[1] == "USDT":
+            return "USDT"
+        
+        # Handle cases like "buy_BTC_USDT" or "sell_ETH_USDT"
+        if len(parts) == 3 and parts[2] == "USDT":
+            return parts[1]
+        
+        # Default case for normal coins
         return parts[1]
-    
-    # Default case for normal coins
-    return parts[1]
+    except Exception as e:
+        logger.error(f"Error parsing callback data '{callback_data}': {str(e)}")
+        raise
 
 async def start_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
@@ -151,7 +161,32 @@ async def handle_sell_amount_option(update: Update, context: ContextTypes.DEFAUL
         coin = extract_coin_from_callback(query.data)
         context.user_data['trade_coin'] = coin
         
+        # Get current holdings and price
+        selected_api = await get_selected_api(update.effective_user.id)
+        if not selected_api:
+            await query.edit_message_text("Please select an API first using 🔐 My APIs")
+            return ConversationHandler.END
+            
+        holdings = get_spot_holdings(
+            api_key=selected_api['api_key'],
+            api_secret=selected_api['api_secret']
+        )
+        
+        # Find coin balance and price
+        coin_balance = 0
+        coin_price = 0
+        for account in holdings.values():
+            for holding in account['holdings']:
+                if holding['currency'] == coin:
+                    coin_balance = holding['total']
+                    coin_price = holding['price_usdt']
+                    break
+        
+        usdt_value = coin_balance * coin_price
+        
         await query.edit_message_text(
+            f"You have {coin_balance:.8f} {coin}\n"
+            f"≈ {usdt_value:.2f} USDT\n\n"
             f"How many {coin} would you like to sell?\n"
             "Please enter the amount or /cancel to abort."
         )
@@ -166,11 +201,38 @@ async def handle_sell_usdt_option(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     
     try:
-        _, coin = extract_coin_from_callback(query.data).split('usdt_')
+        coin = extract_coin_from_callback(query.data)
+        logger.info(f"Handling USDT sell for coin: {coin}")  # Debug logging
+        
         context.user_data['trade_coin'] = coin
         context.user_data['sell_by_usdt'] = True
         
+        # Get current holdings and price
+        selected_api = await get_selected_api(update.effective_user.id)
+        if not selected_api:
+            await query.edit_message_text("Please select an API first using 🔐 My APIs")
+            return ConversationHandler.END
+            
+        holdings = get_spot_holdings(
+            api_key=selected_api['api_key'],
+            api_secret=selected_api['api_secret']
+        )
+        
+        # Find coin balance and price
+        coin_balance = 0
+        coin_price = 0
+        for account in holdings.values():
+            for holding in account['holdings']:
+                if holding['currency'] == coin:
+                    coin_balance = holding['total']
+                    coin_price = holding['price_usdt']
+                    break
+        
+        usdt_value = coin_balance * coin_price
+        
         await query.edit_message_text(
+            f"You have {coin_balance:.8f} {coin}\n"
+            f"≈ {usdt_value:.2f} USDT\n\n"
             f"How much USDT worth of {coin} would you like to sell?\n"
             "Please enter the USDT amount or /cancel to abort."
         )
