@@ -6,6 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotComm
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters, CallbackQueryHandler
 from functools import wraps
 from gate_script import check_ticker_exists
+
 import logging
 
 from handlers.alert_handlers import (
@@ -26,7 +27,7 @@ from menu_handlers import show_main_menu, start, handle_message
 from handlers.trade_handlers import (
     start_buy, start_sell, execute_trade, cancel_trade,
     handle_sell_amount_option, handle_sell_percentage, 
-    start_buy_flow,
+    start_buy_flow, handle_sell_usdt_option,
     TRADE_AMOUNT, TRADE_PERCENTAGE
 )
 
@@ -129,7 +130,7 @@ def setup_handlers(app):
         name='alert_conversation'
     )
 
-    # Update trade handler to remove unneeded handlers
+    # Update trade handler to include USDT-based selling
     trade_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(start_buy, pattern=r'^buy_[A-Z0-9]+$'),
@@ -139,7 +140,8 @@ def setup_handlers(app):
         states={
             TRADE_PERCENTAGE: [
                 CallbackQueryHandler(handle_sell_percentage, pattern=r'^sellpct_\w+_\d+$'),
-                CallbackQueryHandler(handle_sell_amount_option, pattern=r'^sellamt_\w+$')
+                CallbackQueryHandler(handle_sell_amount_option, pattern=r'^sellamt_\w+$'),
+                CallbackQueryHandler(handle_sell_usdt_option, pattern=r'^sellusdt_\w+$')
             ],
             TRADE_AMOUNT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, execute_trade)

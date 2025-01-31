@@ -62,7 +62,10 @@ async def start_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 InlineKeyboardButton("75%", callback_data=f"sellpct_{coin}_75"),
                 InlineKeyboardButton("100%", callback_data=f"sellpct_{coin}_100")
             ],
-            [InlineKeyboardButton("Enter custom amount", callback_data=f"sellamt_{coin}")]
+            [
+                InlineKeyboardButton("Enter coin amount", callback_data=f"sellamt_{coin}"),
+                InlineKeyboardButton("Enter USDT amount", callback_data=f"sellusdt_{coin}")
+            ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -154,6 +157,25 @@ async def handle_sell_amount_option(update: Update, context: ContextTypes.DEFAUL
         await query.edit_message_text(f"Error setting up sell amount: {str(e)}")
         return ConversationHandler.END
 
+async def handle_sell_usdt_option(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        _, coin = extract_coin_from_callback(query.data).split('usdt_')
+        context.user_data['trade_coin'] = coin
+        context.user_data['sell_by_usdt'] = True
+        
+        await query.edit_message_text(
+            f"How much USDT worth of {coin} would you like to sell?\n"
+            "Please enter the USDT amount or /cancel to abort."
+        )
+        return TRADE_AMOUNT
+    except Exception as e:
+        logger.error(f"Error in handle_sell_usdt_option: {str(e)}")
+        await query.edit_message_text(f"Error setting up sell amount: {str(e)}")
+        return ConversationHandler.END
+
 async def start_buy_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Start the buying process by asking for the coin"""
     context.user_data['awaiting_custom_coin'] = True
@@ -202,6 +224,41 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             await update.message.reply_text("Please select an API first using 🔐 My APIs")
             return ConversationHandler.END
 
+        # Handle USDT-based selling
+        if trade_type == 'sell' and context.user_data.get('sell_by_usdt'):
+            # Get current price to convert USDT amount to coin amount
+            spot_holdings = get_spot_holdings(
+                api_key=selected_api['api_key'],
+                api_secret=selected_api['api_secret']
+            )
+            
+            # Find current price and balance
+            coin_price = None
+            coin_balance = 0
+            for account in spot_holdings.values():
+                for holding in account['holdings']:
+                    if holding['currency'] == coin:
+                        coin_price = holding['price_usdt']
+                        coin_balance = holding['total']
+                        break
+            
+            if not coin_price:
+                await update.message.reply_text(f"Could not get current price for {coin}")
+                return ConversationHandler.END
+                
+            # Convert USDT amount to coin amount
+            coin_amount = amount / coin_price
+            
+            # Check if user has enough balance
+            if coin_amount > coin_balance:
+                await update.message.reply_text(
+                    f"Insufficient balance. You have {coin_balance:.8f} {coin}\n"
+                    f"Required for {amount} USDT: {coin_amount:.8f} {coin}"
+                )
+                return ConversationHandler.END
+                
+            amount = coin_amount  # Use converted amount for the sell order
+
         # Execute the trade using the appropriate function
         if trade_type == 'buy':
             result = buy_spot(
@@ -218,12 +275,21 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
                 amount=amount  # For sell, amount is in the base currency
             )
 
-        await update.message.reply_text(
-            f"{trade_type.title()} order executed successfully!\n"
-            f"Amount: {amount} {'USDT' if trade_type == 'buy' else coin}\n"
-            f"Order ID: {result['order_id']}\n"
-            f"Status: {result['status']}"
-        )
+        # Show appropriate success message
+        if trade_type == 'sell' and context.user_data.get('sell_by_usdt'):
+            await update.message.reply_text(
+                f"Sell order executed successfully!\n"
+                f"Amount: {amount:.8f} {coin} (≈{text} USDT)\n"
+                f"Order ID: {result['order_id']}\n"
+                f"Status: {result['status']}"
+            )
+        else:
+            await update.message.reply_text(
+                f"{trade_type.title()} order executed successfully!\n"
+                f"Amount: {amount} {'USDT' if trade_type == 'buy' else coin}\n"
+                f"Order ID: {result['order_id']}\n"
+                f"Status: {result['status']}"
+            )
         
     except ValueError as e:
         await update.message.reply_text(f"Invalid input: {str(e)}")
@@ -231,6 +297,12 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     except Exception as e:
         await update.message.reply_text(f"Error: {str(e)}")
         return ConversationHandler.END
+    
+    # Clear sell_by_usdt flag
+    if 'sell_by_usdt' in context.user_data:
+        del context.user_data['sell_by_usdt']
+    
+    return ConversationHandler.END
 
 async def cancel_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Trade cancelled.")
