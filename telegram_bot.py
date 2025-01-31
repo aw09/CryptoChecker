@@ -130,7 +130,7 @@ def setup_handlers(app):
         name='alert_conversation'
     )
 
-    # Update trade handler to include USDT-based selling
+    # Update trade handler with fixed patterns
     trade_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(start_buy, pattern=r'^buy_[A-Z0-9]+$'),
@@ -139,9 +139,9 @@ def setup_handlers(app):
         ],
         states={
             TRADE_PERCENTAGE: [
-                CallbackQueryHandler(handle_sell_percentage, pattern=r'^sellpct_\w+_\d+$'),
-                CallbackQueryHandler(handle_sell_amount_option, pattern=r'^sellamt_\w+$'),
-                CallbackQueryHandler(handle_sell_usdt_option, pattern=r'^sellusdt_\w+$')
+                CallbackQueryHandler(handle_sell_percentage, pattern=r'^sellpct_[A-Z0-9]+_\d+$'),
+                CallbackQueryHandler(handle_sell_usdt_option, pattern=r'^sellusdt_[A-Z0-9]+$'),
+                CallbackQueryHandler(handle_sell_amount_option, pattern=r'^sellamt_[A-Z0-9]+$')
             ],
             TRADE_AMOUNT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, execute_trade)
@@ -150,7 +150,11 @@ def setup_handlers(app):
         fallbacks=[CommandHandler('cancel', cancel_trade)],
         name='trade_conversation'
     )
-
+    
+    # Important: Remove any existing handlers before adding new ones
+    app.handlers.clear()
+    
+    # Add all handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", show_main_menu))
     app.add_handler(alert_conv_handler)

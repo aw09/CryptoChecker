@@ -36,6 +36,8 @@ async def start_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         coin = extract_coin_from_callback(query.data)
         context.user_data['trade_coin'] = coin
         context.user_data['trade_type'] = 'buy'
+        context.user_data['trade_coin'] = coin
+        context.user_data['trade_type'] = 'buy'
         
         await query.answer()
         await query.edit_message_text(
@@ -51,6 +53,7 @@ async def start_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def start_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         query = update.callback_query
+        logger.info(f"Received sell callback with data: {query.data}")  # Add debug logging
         coin = extract_coin_from_callback(query.data)
         context.user_data['trade_coin'] = coin
         context.user_data['trade_type'] = 'sell'
@@ -77,7 +80,8 @@ async def start_sell(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return TRADE_PERCENTAGE
     except Exception as e:
         logger.error(f"Error in start_sell: {str(e)}")
-        await query.edit_message_text(f"Error starting sell: {str(e)}")
+        if update.callback_query:
+            await update.callback_query.edit_message_text(f"Error starting sell: {str(e)}")
         return ConversationHandler.END
 
 async def handle_sell_percentage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -307,3 +311,5 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def cancel_trade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text("Trade cancelled.")
     return ConversationHandler.END
+    return ConversationHandler.END
+
