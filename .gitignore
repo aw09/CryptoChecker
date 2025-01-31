@@ -3,3 +3,4 @@
 chart.png
 .venv
 .streamlit/secrets.toml
+.vscode
