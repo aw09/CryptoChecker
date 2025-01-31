@@ -99,6 +99,7 @@ async def sendHoldings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         ]
         
         account_total_usdt = {}
+        keyboard = []
         
         for account_name, data in all_holdings.items():
             message_parts.append(f"\n=== {data['name']} ===")
@@ -115,6 +116,10 @@ async def sendHoldings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     f"\n  Price: {format(holding['price_usdt'], '.4f')} USDT"
                     f"\n  Value: {format(holding['value_usdt'], '.2f')} USDT"
                 )
+                keyboard.append([
+                    InlineKeyboardButton(f"Buy {holding['currency']}", callback_data=f"buy_{holding['currency']}"),
+                    InlineKeyboardButton(f"Sell {holding['currency']}", callback_data=f"sell_{holding['currency']}")
+                ])
             
             account_total_usdt[account_name] = account_total
             message_parts.append(f"\nSubtotal: {format(account_total, '.2f')} USDT")
@@ -122,9 +127,9 @@ async def sendHoldings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         grand_total = sum(account_total_usdt.values())
         message_parts.append(f"\n=== GRAND TOTAL ===\n{format(grand_total, '.2f')} USDT")
         
-        keyboard = [[
+        keyboard.append([
             InlineKeyboardButton("🔄 Refresh", callback_data="refresh_holdings")
-        ]]
+        ])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         full_message = '\n'.join(message_parts)

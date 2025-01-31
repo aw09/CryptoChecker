@@ -170,15 +170,24 @@ async def test_send_holdings_direct_message_success(update, context, mock_select
         
         # Check final message
         final_call = calls[-1]
-        kwargs = final_call[1]  # Get kwargs
-        message_text = kwargs['text']  # Get text from kwargs
-        reply_markup = kwargs['reply_markup']  # Get reply_markup from kwargs
+        kwargs = final_call[1]
+        message_text = kwargs['text']
+        reply_markup = kwargs['reply_markup']
         
         # Check content
         assert "🔑 Using API: Test API" in message_text
         assert "BTC" in message_text
-        assert isinstance(reply_markup, InlineKeyboardMarkup)
-        assert reply_markup.inline_keyboard[0][0].callback_data == "refresh_holdings"
+        
+        # Check keyboard structure
+        keyboard = reply_markup.inline_keyboard
+        # First row should have buy/sell buttons for BTC
+        assert keyboard[0][0].callback_data == "buy_BTC"
+        assert keyboard[0][1].callback_data == "sell_BTC"
+        # Second row should have buy/sell buttons for ETH
+        assert keyboard[1][0].callback_data == "buy_ETH"
+        assert keyboard[1][1].callback_data == "sell_ETH"
+        # Last row should have refresh button
+        assert keyboard[-1][0].callback_data == "refresh_holdings"
 
 @pytest.mark.asyncio
 async def test_send_holdings_callback_query_success(update, context, mock_selected_api, mock_holdings_data):
@@ -198,8 +207,17 @@ async def test_send_holdings_callback_query_success(update, context, mock_select
         assert "🔑 Using API: Test API" in message_text
         assert "BTC" in message_text
         assert "Amount: 0.50000000" in message_text
-        assert isinstance(reply_markup, InlineKeyboardMarkup)
-        assert reply_markup.inline_keyboard[0][0].callback_data == "refresh_holdings"
+        
+        # Check keyboard structure
+        keyboard = reply_markup.inline_keyboard
+        # First row should have buy/sell buttons for BTC
+        assert keyboard[0][0].callback_data == "buy_BTC"
+        assert keyboard[0][1].callback_data == "sell_BTC"
+        # Second row should have buy/sell buttons for ETH
+        assert keyboard[1][0].callback_data == "buy_ETH"
+        assert keyboard[1][1].callback_data == "sell_ETH"
+        # Last row should have refresh button
+        assert keyboard[-1][0].callback_data == "refresh_holdings"
 
 @pytest.mark.asyncio
 async def test_send_info_no_api_direct_message(update, context):
