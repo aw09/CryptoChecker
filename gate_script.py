@@ -181,6 +181,140 @@ def get_earn_balances(api_key: str = None, api_secret: str = None):
         logger.error(f"Gate.io Earn API error: {str(e)}")
         raise
 
+def get_lending_rates(api_key: str = None, api_secret: str = None):
+    """Get available lending rates for all currencies"""
+    try:
+        if not api_key or not api_secret:
+            raise ValueError("API credentials are required")
+            
+        client_data = get_client(api_key, api_secret)
+        earn_uni_api = gate_api.EarnUniApi(client_data["client"])
+        
+        # Get lending market info
+        lending_currencies = earn_uni_api.list_uni_currencies()
+        rates = {}
+        
+        for currency in lending_currencies:
+            rates[currency.currency] = {
+                "min_rate": float(currency.min_rate),
+                "max_rate": float(currency.max_rate),
+                "min_amount": float(currency.min_lend_amount),
+                "max_amount": float(currency.max_lend_amount)
+            }
+        
+        return rates
+            
+    except Exception as e:
+        logger.error(f"Gate.io Earn API error: {str(e)}")
+        raise
+
+def lend_to_earn(api_key: str, api_secret: str, currency: str, amount: float, min_rate: float = None):
+    """Lend funds to Gate.io Earn products"""
+    try:
+        if not api_key or not api_secret:
+            raise ValueError("API credentials are required")
+            
+        client_data = get_client(api_key, api_secret)
+        earn_uni_api = gate_api.EarnUniApi(client_data["client"])
+        
+        # If min_rate not provided, get it from lending rates
+        if min_rate is None:
+            rates = get_lending_rates(api_key, api_secret)
+            if currency not in rates:
+                raise ValueError(f"Currency {currency} not available for lending")
+            min_rate = rates[currency]['min_rate']
+        
+        # Format min_rate as decimal string
+        formatted_min_rate = "{:.8f}".format(min_rate)
+        
+        # Create lending request
+        lend_request = gate_api.CreateUniLend(
+            currency=currency,
+            amount=str(amount),
+            min_rate=formatted_min_rate,
+            type='lend'
+        )
+        
+        # Submit lending request
+        result = earn_uni_api.create_uni_lend(lend_request)
+        
+        return {
+            "status": "success",
+            "currency": currency,
+            "amount": amount,
+            "min_rate": min_rate
+        }
+            
+    except Exception as e:
+        logger.error(f"Gate.io Earn lending error: {str(e)}")
+        raise
+
+def redeem_from_earn(api_key: str, api_secret: str, currency: str, amount: float = None, redeem_all: bool = False):
+    """Redeem funds from Gate.io Earn products"""
+    try:
+        if not api_key or not api_secret:
+            raise ValueError("API credentials are required")
+            
+        client_data = get_client(api_key, api_secret)
+        earn_uni_api = gate_api.EarnUniApi(client_data["client"])
+        
+        # If redeem_all is True, get current earn balance
+        if redeem_all:
+            earn_records = earn_uni_api.list_user_uni_lends()
+            for record in earn_records:
+                if record.currency == currency:
+                    amount = float(record.amount)
+                    break
+            if not amount:
+                raise ValueError(f"No balance found for {currency} in earn")
+        elif amount is None:
+            raise ValueError("Must specify amount or set redeem_all=True")
+        
+        # Create redemption request
+        redeem_request = gate_api.CreateUniLend(
+            currency=currency,
+            amount=str(amount),
+            type='redeem'
+        )
+        
+        # Submit redemption request - API returns None on success
+        earn_uni_api.create_uni_lend(redeem_request)
+        
+        # Return success response without order_id and create_time
+        return {
+            "status": "success",
+            "currency": currency,
+            "amount": amount
+        }
+            
+    except Exception as e:
+        logger.error(f"Gate.io Earn redemption error: {str(e)}")
+        raise
+
+# Update the main block to test the new functionality
 if __name__ == '__main__':
-    balances = get_balance()
-    print(balances)
+    from dotenv import load_dotenv
+    import os
+
+    load_dotenv()
+
+    API_KEY = os.getenv('GATE_API_KEY')
+    API_SECRET = os.getenv('GATE_API_SECRET')
+
+    try:
+        # Check earn balances before redemption
+        balances = get_earn_balances(API_KEY, API_SECRET)
+        print("Earn balances:", balances)
+
+        # Test redeeming all BTC from earn
+        result = redeem_from_earn(API_KEY, API_SECRET, "BTC", redeem_all=True)
+        print("Redemption result:", result)
+        
+        # Check updated earn balances after redemption
+        balances = get_earn_balances(API_KEY, API_SECRET)
+        print("\nUpdated earn balances:", balances)
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        logger.error(f"Redemption error: {str(e)}")
+
