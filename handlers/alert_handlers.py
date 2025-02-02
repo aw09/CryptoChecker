@@ -41,11 +41,7 @@ async def alert_coin_received(update: Update, context: ContextTypes.DEFAULT_TYPE
         context.user_data['coin'] = coin
         current_price = check_current_price(selected_api['api_key'], selected_api['api_secret'], coin)
         await update.message.reply_text(
-            f"Current price for {coin} is {current_price} USDT.\nPlease choose condition:",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("<", callback_data="alert_condition_less"),
-                 InlineKeyboardButton(">", callback_data="alert_condition_greater")]
-            ])
+            f"Current price for {coin} is {current_price} USDT.\nPlease enter condition (< or >):"
         )
         return ALERT_CONDITION
         
